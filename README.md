@@ -12,9 +12,21 @@ A name parser specifically designed for the complexity of Latin American identit
   - `Natural`: Juan Carlos De La O Vargas
   - `Standard`: Juan Carlos De-La-O-Vargas (Ideal for Database integrity)
   - `Full-Hyphen`: Juan-Carlos De-La-O-Vargas (Ideal for emails/slugs)
+
 - **Zero Dependencies**: Written in pure TypeScript.
 
-## 📦 Installation (Coming Soon)
+## Dictionaries & Data Sources
+
+The core accuracy of this library comes from real-world data mining, not just grammatical rules.
+
+- **Costa Rica (CR)**:
+  - Source: Official electoral rolls (Padron Electoral) from the Supreme Electoral Tribunal (TSE).
+  - Dataset Composition: Consolidated data from the years 2011, 2012, 2013, 2015, 2017, 2021, 2022, and 2026.
+  - Source URL: https://www.tse.go.cr/descarga_padron.html
+
+_More countries coming soon._
+
+## Installation (Coming Soon)
 
 ```bash
 npm install latam-name-parser
