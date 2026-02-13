@@ -32,11 +32,17 @@ Our dictionaries are precision-engineered for performance and accuracy:
 
 ### Sources
 
+- **Argentina (AR)**:
+  - Source: National Registry of Persons (RENAPER) via the Government Open Data Portal.
+  - Dataset Composition: "Distribution of Surnames by Province" dataset, filtered for compound surnames and frequency analysis.
+  - Source URL: https://datos.gob.ar/dataset/renaper-distribucion-apellidos-argentina
+
 - **Costa Rica (CR)**:
   - Source: Official electoral rolls (Padron Electoral) from the Supreme Electoral Tribunal (TSE).
   - Dataset Composition: Consolidated data from the years 2011, 2012, 2013, 2015, 2017, 2021, 2022, and 2026.
   - Source URL: https://www.tse.go.cr/descarga_padron.html
-    _More countries coming soon._
+
+  _More countries coming soon._
 
 ## Installation (Coming Soon)
 

@@ -1,17 +1,29 @@
 {
   "name": "latam-name-parser",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A specialized parser for Latin American names using reverse subtraction strategies and regional dictionaries",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "latam",
+    "names",
+    "parser",
+    "hispanic",
+    "surnames"
+  ],
+  "author": "Alberto Arias Sáenz",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
   "devDependencies": {
-    "@types/node": "^25.2.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.x.x",
+    "ts-node": "^10.x.x",
+    "@types/node": "^20.x.x"
   }
 }
