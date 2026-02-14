@@ -26,6 +26,14 @@ This library isn't just based on grammatical rules; it is **data-mined**. We val
 
 ---
 
+## Installation
+
+Install the package via your favorite package manager:
+
+```
+npm install latam-name-parser
+```
+
 ---
 
 ## Usage
@@ -33,6 +41,7 @@ This library isn't just based on grammatical rules; it is **data-mined**. We val
 **Basic Implementation**
 Import the parser and use the LATAM dictionary set for maximum coverage across all supported countries.
 
+```
 import { LatamNameParser, Dictionaries } from "latam-name-parser";
 
 // Initialize with full Latin American coverage
@@ -44,19 +53,22 @@ const input = "MARIA DEL CARMEN GUTIERREZ DE PIÑERES RENAULD";
 const parsed = parser.parse(input);
 
 console.log(parsed);
+```
 
-Output:
-{
+```
+Output:{
 "fullName": "MARIA DEL CARMEN GUTIERREZ DE PIÑERES RENAULD",
 "givenName": "MARIA DEL CARMEN",
 "surname1": "GUTIERREZ DE PIÑERES",
 "surname2": "RENAULD",
 "isCompound": true
 }
+```
 
 Performance Optimization (Specific Countries)
 If you only need to process data from a specific region (e.g., Costa Rica), you can load only that dictionary to gain a slight performance boost and reduce "noise" from other regions.
 
+```
 import { LatamNameParser, Dictionaries } from "latam-name-parser";
 
 // Optimized for Costa Rica (CR)
@@ -66,41 +78,46 @@ dictionaries: [Dictionaries.CR]
 
 const result = parser.parse("JUAN CARLOS DE LA O VARGAS");
 // Result: { givenName: "JUAN CARLOS", surname1: "DE LA O", surname2: "VARGAS" }
+```
 
 ---
 
----
+## How it Works
 
-**How it Works**
-Latin American names are difficult because:
+### Latin American names are difficult because:
 
 Compound Surnames: "Cruz" is a surname, but "Santa Cruz" is also a surname.
+
 Ambiguous Middle Names: "Jesus" can be a name (María de Jesús) or a surname (De Jesús).
+
 Particles: "De", "La", "Del" appear everywhere.
 
-Our "Reverse Subtraction" Strategy:
+### Our "Reverse Subtraction" Strategy:
 
 Compound Detection: We check the end of the string against a dictionary of compound surnames, sorted by length (longest first).
+
 Suffix Arbitration: If a compound candidate is found, a heuristic arbitrator decides if it's a valid surname or a Name-Surname collision based on statistical rarity.
+
 Subtraction: Once the Second Surname is identified and removed, we repeat the process for the First Surname.
+
 Remainder: Whatever is left is the Given Name(s).
 
 ---
 
----
+## Data Sources
 
-**Data Sources**
 Our dictionaries are precision-engineered from open government data:
 
 Argentina (AR): RENAPER (National Registry of Persons).
+
 Costa Rica (CR): TSE (Supreme Electoral Tribunal).
+
 Mexico (MX): PUB (Unified Beneficiary Roster).
 
 ---
 
----
+## License
 
-License
-MIT License. Feel free to use this in commercial or personal projects.
+### MIT License. Feel free to use this in commercial or personal projects.
 
 ---
