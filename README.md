@@ -1,5 +1,8 @@
 # Latam Name Parser
 
+````markdown
+![NPM Version](https://img.shields.io/npm/v/latam-name-parser?style=flat-square&color=blue)
+
 A name parser specifically designed for the complexity of Latin American identities. It uses a "Reverse Subtraction with Anchoring" strategy and compound surname dictionaries to ensure accuracy superior to standard Anglo-Saxon libraries.
 
 ## Features
@@ -42,10 +45,43 @@ Our dictionaries are precision-engineered for performance and accuracy:
   - Dataset Composition: Consolidated data from the years 2011, 2012, 2013, 2015, 2017, 2021, 2022, and 2026.
   - Source URL: https://www.tse.go.cr/descarga_padron.html
 
-  _More countries coming soon._
+- **Mexico (MX)**:
+  - Source: Unified Beneficiary Roster (PUB) from the Secretariat of Well-being (Secretaría de Bienestar).
+  - Dataset Composition: Mined data from "Sembrando Vida" and "Pensión para el Bienestar de las Personas Adultas Mayores" programs, covering records from 2019 to 2025.
+  - Source URL: https://pub.bienestar.gob.mx/pub
 
-## Installation (Coming Soon)
+_More countries coming soon._
+
+## Installation
+
+Install the package via your favorite package manager:
 
 ```bash
 npm install latam-name-parser
+```
+````
+
+## Usage
+
+### Basic Implementation
+
+Import the parser and the dictionaries. You can choose specific countries for optimization or use the `LATAM` set for maximum coverage.
+
+```typescript
+import { LatamNameParser, Dictionaries } from "latam-name-parser";
+
+// Option A: Specific Countries (Recommended for granular control)
+const parser = new LatamNameParser({
+  dictionaries: [Dictionaries.MX, Dictionaries.AR],
+});
+
+// Option B: All Latin America (Easiest for full coverage)
+// const parser = new LatamNameParser({
+//   dictionaries: [Dictionaries.LATAM],
+// });
+
+const input = "María de los Angeles Del Real Castillo";
+const parsed = parser.parse(input);
+
+console.log(parsed);
 ```
