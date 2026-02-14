@@ -1,3 +1,4 @@
+import { SurnameArbitrator } from "./SurnameArbitrator";
 import {
   ParsedName,
   LatamParserOptions,
@@ -8,6 +9,7 @@ import {
 export class LatamNameParser {
   private compoundSet: Set<string>;
   private maxCompoundWords: number = 0;
+  private arbitrator: SurnameArbitrator;
 
   constructor(options: LatamParserOptions) {
     const allCompounds = options.dictionaries
@@ -15,6 +17,7 @@ export class LatamNameParser {
       .map((s) => s.trim().toUpperCase());
 
     this.compoundSet = new Set(allCompounds);
+    this.arbitrator = new SurnameArbitrator();
 
     this.maxCompoundWords = allCompounds.reduce((max, current) => {
       const words = current.split(" ").length;
@@ -29,7 +32,6 @@ export class LatamNameParser {
     let s1 = "";
     let s2 = "";
     let isCompound = false;
-
     const foundS2 = this.findCompoundSuffixOptimized(currentString);
     if (foundS2) {
       s2 = foundS2;
@@ -44,7 +46,6 @@ export class LatamNameParser {
         currentString = parts.join(" ");
       }
     }
-
     const foundS1 = this.findCompoundSuffixOptimized(currentString);
     if (foundS1) {
       s1 = foundS1;
@@ -59,17 +60,14 @@ export class LatamNameParser {
         currentString = parts.join(" ");
       }
     }
-
     let finalGiven = currentString;
     let finalS1 = s1;
     let finalS2 = s2;
-
     if (!finalGiven && finalS1) {
       finalGiven = finalS1;
       finalS1 = finalS2;
       finalS2 = "";
     }
-
     return {
       fullName: originalName,
       givenName: finalGiven,
@@ -87,11 +85,9 @@ export class LatamNameParser {
     const toTitleCase = (str: string) =>
       str.toLowerCase().replace(/(?:^|\s|-)\S/g, (c) => c.toUpperCase());
     const hyphenate = (str: string) => str.replace(/\s+/g, "-");
-
     let finalGiven = toTitleCase(givenName);
     let finalS1 = toTitleCase(surname1);
     let finalS2 = toTitleCase(surname2);
-
     switch (format) {
       case "hyphenated-full":
         finalGiven = hyphenate(finalGiven);
@@ -105,25 +101,20 @@ export class LatamNameParser {
       case "natural":
         break;
     }
-
     let unitedSurname = "";
     const separator = format === "natural" ? " " : "-";
-
     if (finalS1 && finalS2) {
       unitedSurname = `${finalS1}${separator}${finalS2}`;
     } else {
       unitedSurname = finalS1;
     }
-
     const full = finalGiven ? `${finalGiven} ${unitedSurname}` : unitedSurname;
-
     return {
       givenName: finalGiven,
       surname: unitedSurname,
       fullName: full.trim(),
     };
   }
-
   private findCompoundSuffixOptimized(text: string): string | null {
     const tokens = text.split(" ");
     if (tokens.length < 2) return null;
@@ -132,8 +123,12 @@ export class LatamNameParser {
 
     for (let i = maxWordsToCheck; i >= 2; i--) {
       const candidate = tokens.slice(-i).join(" ");
+      const remainingText = tokens.slice(0, tokens.length - i).join(" ");
+
       if (this.compoundSet.has(candidate)) {
-        return candidate;
+        if (this.arbitrator.isValid(candidate, remainingText)) {
+          return candidate;
+        }
       }
     }
     return null;
