@@ -4,6 +4,10 @@ export interface ParsedName {
   surname1: string;
   surname2: string;
   isCompound: boolean;
+
+  toNatural(): string;
+  toStandard(): string;
+  toFullHyphen(): string;
 }
 
 export type OutputFormat = "hyphenated-full" | "hyphenated-surname" | "natural";

@@ -1,10 +1,5 @@
 import { SurnameArbitrator } from "./SurnameArbitrator";
-import {
-  ParsedName,
-  LatamParserOptions,
-  AnglicizedName,
-  OutputFormat,
-} from "./types";
+import { ParsedName, LatamParserOptions } from "./types";
 
 export class LatamNameParser {
   private compoundSet: Set<string>;
@@ -26,12 +21,15 @@ export class LatamNameParser {
   }
 
   public parse(fullName: string): ParsedName {
+    // --- TU LÓGICA ORIGINAL INTACTA ---
     let currentString = fullName.trim().toUpperCase().replace(/\s+/g, " ");
     const originalName = currentString;
 
     let s1 = "";
     let s2 = "";
     let isCompound = false;
+
+    // Buscando S2
     const foundS2 = this.findCompoundSuffixOptimized(currentString);
     if (foundS2) {
       s2 = foundS2;
@@ -46,6 +44,8 @@ export class LatamNameParser {
         currentString = parts.join(" ");
       }
     }
+
+    // Buscando S1
     const foundS1 = this.findCompoundSuffixOptimized(currentString);
     if (foundS1) {
       s1 = foundS1;
@@ -60,61 +60,83 @@ export class LatamNameParser {
         currentString = parts.join(" ");
       }
     }
+
     let finalGiven = currentString;
     let finalS1 = s1;
     let finalS2 = s2;
+
+    // Ajuste final si no hay nombre
     if (!finalGiven && finalS1) {
       finalGiven = finalS1;
       finalS1 = finalS2;
       finalS2 = "";
     }
+    // --- FIN DE TU LÓGICA ORIGINAL ---
+
+    // Preparación para los métodos helper (Title Case)
+    const fmtGiven = this.formatTitleCase(finalGiven);
+    const fmtS1 = this.formatTitleCase(finalS1);
+    const fmtS2 = this.formatTitleCase(finalS2);
+    const fmtFull = this.formatTitleCase(originalName);
+
     return {
-      fullName: originalName,
-      givenName: finalGiven,
-      surname1: finalS1,
-      surname2: finalS2,
+      fullName: fmtFull,
+      givenName: fmtGiven,
+      surname1: fmtS1,
+      surname2: fmtS2,
       isCompound,
+
+      // --- NUEVOS MÉTODOS INYECTADOS ---
+
+      /**
+       * Natural: Nombre limpio y canónico.
+       * Elimina guiones del input y espacios extra.
+       */
+      toNatural: function () {
+        return `${this.givenName} ${this.surname1} ${this.surname2}`
+          .replace(/-/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      },
+
+      /**
+       * Standard: Apellidos unidos con guiones.
+       * Ej: "Juan Carlos De-La-O-Vargas"
+       */
+      toStandard: function () {
+        const s1Hyphen = this.surname1.replace(/\s+/g, "-");
+        const s2Hyphen = this.surname2.replace(/\s+/g, "-");
+        let united = `${s1Hyphen}-${s2Hyphen}`
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "");
+
+        return `${this.givenName} ${united}`.trim();
+      },
+
+      /**
+       * Full-Hyphen: Todo con guiones (Slugs).
+       * Ej: "Juan-Carlos-De-La-O-Vargas"
+       */
+      toFullHyphen: function () {
+        return `${this.givenName} ${this.surname1} ${this.surname2}`
+          .trim()
+          .replace(/\s+/g, "-")
+          .replace(/-+/g, "-");
+      },
     };
   }
 
-  public getAnglicizedFormat(
-    parsed: ParsedName,
-    format: OutputFormat = "hyphenated-surname",
-  ): AnglicizedName {
-    const { givenName, surname1, surname2 } = parsed;
-    const toTitleCase = (str: string) =>
-      str.toLowerCase().replace(/(?:^|\s|-)\S/g, (c) => c.toUpperCase());
-    const hyphenate = (str: string) => str.replace(/\s+/g, "-");
-    let finalGiven = toTitleCase(givenName);
-    let finalS1 = toTitleCase(surname1);
-    let finalS2 = toTitleCase(surname2);
-    switch (format) {
-      case "hyphenated-full":
-        finalGiven = hyphenate(finalGiven);
-        finalS1 = hyphenate(finalS1);
-        finalS2 = hyphenate(finalS2);
-        break;
-      case "hyphenated-surname":
-        finalS1 = hyphenate(finalS1);
-        finalS2 = hyphenate(finalS2);
-        break;
-      case "natural":
-        break;
-    }
-    let unitedSurname = "";
-    const separator = format === "natural" ? " " : "-";
-    if (finalS1 && finalS2) {
-      unitedSurname = `${finalS1}${separator}${finalS2}`;
-    } else {
-      unitedSurname = finalS1;
-    }
-    const full = finalGiven ? `${finalGiven} ${unitedSurname}` : unitedSurname;
-    return {
-      givenName: finalGiven,
-      surname: unitedSurname,
-      fullName: full.trim(),
-    };
+  // Helper privado para capitalizar (Title Case)
+  private formatTitleCase(str: string): string {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
   }
+
+  // --- TU LÓGICA DE BÚSQUEDA ORIGINAL (sin cambios) ---
   private findCompoundSuffixOptimized(text: string): string | null {
     const tokens = text.split(" ");
     if (tokens.length < 2) return null;

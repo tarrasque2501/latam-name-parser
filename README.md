@@ -4,7 +4,7 @@
 [![Downloads](https://img.shields.io/npm/dt/latam-name-parser?style=for-the-badge&color=green)](https://www.npmjs.com/package/latam-name-parser)
 [![License](https://img.shields.io/npm/l/latam-name-parser?style=for-the-badge&color=orange)](https://github.com/tarrasque2501/latam-name-parser/blob/main/LICENSE)
 
-> **New in v1.1.1:** Major accuracy boost! We have successfully stress-tested the parser against **4,094,359 real records** (full Costa Rica Electoral Roll).
+> **New in v1.2.0:** Major accuracy boost! We have successfully stress-tested the parser against **4,094,359 real records** (full Costa Rica Electoral Roll).
 >
 > - **Accuracy:** 99.9928% (Only 295 edge cases out of 4.1 million).
 > - **Speed:** ~112,000 names/second.
@@ -85,9 +85,9 @@ const result = parser.parse("JUAN CARLOS DE LA O VARGAS");
 
 The Anglicized Output Formats were designed to solve a common problem: many international systems do not handle spaces in surnames or dual surnames well. These formats provide different ways to represent the parsed name to ensure compatibility with various software requirements.
 
-- `Natural`: Juan Carlos De La O Vargas
+- `Natural`: Juan Carlos De La O Vargas (Remove "-" symbols)
 - `Standard`: Juan Carlos De-La-O-Vargas (Ideal for Database integrity)
-- `Full-Hyphen`: Juan-Carlos De-La-O-Vargas (Ideal for emails/slugs)
+- `Full-Hyphen`: Juan-Carlos-De-La-O-Vargas (Ideal for emails/slugs)
 
 ```
 import { LatamNameParser, Dictionaries } from "latam-name-parser";
