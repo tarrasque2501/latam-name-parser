@@ -3,9 +3,8 @@
 [![NPM Version](https://img.shields.io/npm/v/latam-name-parser?style=for-the-badge&color=blue)](https://www.npmjs.com/package/latam-name-parser)
 [![Downloads](https://img.shields.io/npm/dt/latam-name-parser?style=for-the-badge&color=green)](https://www.npmjs.com/package/latam-name-parser)
 [![License](https://img.shields.io/npm/l/latam-name-parser?style=for-the-badge&color=orange)](https://github.com/tarrasque2501/latam-name-parser/blob/main/LICENSE)
-[![Accuracy](https://img.shields.io/badge/Accuracy-99.99%25-success?style=for-the-badge)](https://github.com/tarrasque2501/latam-name-parser)
 
-> **New in v1.2.0:** Major accuracy boost! We have successfully stress-tested the parser against **4,094,359 real records** (full Costa Rica Electoral Roll).
+> **New in v1.1.1:** Major accuracy boost! We have successfully stress-tested the parser against **4,094,359 real records** (full Costa Rica Electoral Roll).
 >
 > - **Accuracy:** 99.9928% (Only 295 edge cases out of 4.1 million).
 > - **Speed:** ~112,000 names/second.
@@ -78,6 +77,33 @@ dictionaries: [Dictionaries.CR]
 
 const result = parser.parse("JUAN CARLOS DE LA O VARGAS");
 // Result: { givenName: "JUAN CARLOS", surname1: "DE LA O", surname2: "VARGAS" }
+```
+
+---
+
+## Anglicized Format Definitions:
+
+The Anglicized Output Formats were designed to solve a common problem: many international systems do not handle spaces in surnames or dual surnames well. These formats provide different ways to represent the parsed name to ensure compatibility with various software requirements.
+
+- `Natural`: Juan Carlos De La O Vargas
+- `Standard`: Juan Carlos De-La-O-Vargas (Ideal for Database integrity)
+- `Full-Hyphen`: Juan-Carlos De-La-O-Vargas (Ideal for emails/slugs)
+
+```
+import { LatamNameParser, Dictionaries } from "latam-name-parser";
+
+const parser = new LatamNameParser({ dictionaries: [Dictionaries.CR] });
+const input = "Juan Carlos De La O Vargas";
+const parsed = parser.parse(input);
+
+// givenName: "Juan Carlos"
+// surname1: "De La O" (Saved by our VALID_SINGLE_LETTERS rule)
+// surname2: "Vargas"
+
+console.log(parsed.toNatural());
+console.log(parsed.toStandard());
+console.log(parsed.toFullHyphen());
+
 ```
 
 ---
