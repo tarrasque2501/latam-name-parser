@@ -112,21 +112,16 @@ console.log(parsed.toFullHyphen());
 
 ### Latin American names are difficult because:
 
-Compound Surnames: "Cruz" is a surname, but "Santa Cruz" is also a surname.
-
-Ambiguous Middle Names: "Jesus" can be a name (María de Jesús) or a surname (De Jesús).
-
-Particles: "De", "La", "Del" appear everywhere.
+- Compound Surnames: "Cruz" is a surname, but "Santa Cruz" is also a surname.
+- Ambiguous Middle Names: "Jesus" can be a name (María de Jesús) or a surname (De Jesús).
+- Particles: "De", "La", "Del" appear everywhere.
 
 ### Our "Reverse Subtraction" Strategy:
 
-Compound Detection: We check the end of the string against a dictionary of compound surnames, sorted by length (longest first).
-
-Suffix Arbitration: If a compound candidate is found, a heuristic arbitrator decides if it's a valid surname or a Name-Surname collision based on statistical rarity.
-
-Subtraction: Once the Second Surname is identified and removed, we repeat the process for the First Surname.
-
-Remainder: Whatever is left is the Given Name(s).
+- Compound Detection: We check the end of the string against a dictionary of compound surnames, sorted by length (longest first).
+- Suffix Arbitration: If a compound candidate is found, a heuristic arbitrator decides if it's a valid surname or a Name-Surname collision based on statistical rarity.
+- Subtraction: Once the Second Surname is identified and removed, we repeat the process for the First Surname.
+- Remainder: Whatever is left is the Given Name(s).
 
 ---
 
@@ -134,11 +129,9 @@ Remainder: Whatever is left is the Given Name(s).
 
 Our dictionaries are precision-engineered from open government data:
 
-Argentina (AR): RENAPER (National Registry of Persons).
-
-Costa Rica (CR): TSE (Supreme Electoral Tribunal).
-
-Mexico (MX): PUB (Unified Beneficiary Roster).
+- `Argentina (AR)`: RENAPER (National Registry of Persons).
+- `Costa Rica (CR)`: TSE (Supreme Electoral Tribunal).
+- `Mexico (MX)`: PUB (Unified Beneficiary Roster).
 
 ---
 
