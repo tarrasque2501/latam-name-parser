@@ -2,21 +2,33 @@ import fs from "fs";
 import path from "path";
 import readline from "readline";
 
-const TEST_DIR = path.join(__dirname, "../../src/data/test/cr");
-const REPORT_BASE_NAME = "final_report";
-const DATA_DIR = path.join(__dirname, "../../src/data");
+const DATA_ROOT = path.join(__dirname, "../../src/data");
+
+const CONFIGS: Record<string, { name: string; dir: string; suffix: string }> = {
+  cr: {
+    name: "Costa Rica",
+    dir: path.join(DATA_ROOT, "test/cr"),
+    suffix: "_CR.json",
+  },
+  mx: {
+    name: "México",
+    dir: path.join(DATA_ROOT, "test/mx"),
+    suffix: "_MX.json",
+  },
+};
 
 const SAMPLE_LIMIT = 50;
 
-function getNextReportFileName(): string {
+function getReportFilename(countryCode: string): string {
+  const baseName = `final_report_${countryCode.toUpperCase()}`;
+  let fileName = `${baseName}.txt`;
+  let fullPath = path.join(DATA_ROOT, fileName);
   let counter = 0;
-  let fileName = `${REPORT_BASE_NAME}.txt`;
-  let fullPath = path.join(DATA_DIR, fileName);
 
   while (fs.existsSync(fullPath)) {
     counter++;
-    fileName = `${REPORT_BASE_NAME}_${counter}.txt`;
-    fullPath = path.join(DATA_DIR, fileName);
+    fileName = `${baseName}_${counter}.txt`;
+    fullPath = path.join(DATA_ROOT, fileName);
   }
   return fullPath;
 }
@@ -38,100 +50,119 @@ async function* zipFiles(pathA: string, pathB: string) {
   }
 }
 
-function formatComparison(recCR: any, recLATAM: any, label: string): string {
+function formatComparison(
+  recSpecific: any,
+  recLATAM: any,
+  label: string,
+): string {
   const fmt = (p: any) => `[${p.n}] [${p.ap1}] [${p.ap2}]`;
 
   return (
-    `${label}: "${recCR.nombreCompleto}"\n` +
-    `   Esperado:   ${fmt(recCR.esperado)}\n` +
-    `   CR Dice:    ${fmt(recCR.obtenido)} ${recCR.esCorrecto ? "✅" : "❌"}\n` +
+    `${label}: "${recSpecific.nombreCompleto}"\n` +
+    `   Esperado:   ${fmt(recSpecific.esperado)}\n` +
+    `   Local Dice: ${fmt(recSpecific.obtenido)} ${recSpecific.esCorrecto ? "✅" : "❌"}\n` +
     `   LATAM Dice: ${fmt(recLATAM.obtenido)} ${recLATAM.esCorrecto ? "✅" : "❌"}`
   );
 }
 
 async function analyze() {
-  console.log("INICIANDO ANÁLISIS DETALLADO (CR vs LATAM)...");
+  const countryArg = process.argv[2]?.toLowerCase() || "cr";
+  const config = CONFIGS[countryArg];
 
-  if (!fs.existsSync(TEST_DIR)) {
-    console.error(`No existe el directorio: ${TEST_DIR}`);
+  if (!config) {
+    console.error(`País no soportado: ${countryArg}`);
+    console.error(`   Opciones: ${Object.keys(CONFIGS).join(", ")}`);
     return;
   }
 
-  const filesCR = fs
-    .readdirSync(TEST_DIR)
-    .filter((f) => f.match(/^results_part_\d+_CR\.json$/))
+  console.log(`INICIANDO ANÁLISIS DETALLADO: ${config.name} vs LATAM`);
+  console.log(`Directorio: ${config.dir}`);
+
+  if (!fs.existsSync(config.dir)) {
+    console.error(`No existe el directorio: ${config.dir}`);
+    return;
+  }
+
+  const filesSpecific = fs
+    .readdirSync(config.dir)
+    .filter((f) => f.endsWith(config.suffix))
     .sort((a, b) => {
       const nA = parseInt(a.match(/\d+/)?.[0] || "0");
       const nB = parseInt(b.match(/\d+/)?.[0] || "0");
       return nA - nB;
     });
 
-  if (filesCR.length === 0) {
-    console.error("No se encontraron archivos de resultados.");
+  if (filesSpecific.length === 0) {
+    console.error(
+      `No se encontraron archivos de resultados (*${config.suffix}).`,
+    );
     return;
   }
 
-  console.log(`Analizando ${filesCR.length} fragmentos...`);
+  console.log(`Analizando ${filesSpecific.length} pares de archivos...`);
 
   let stats = {
     total: 0,
-    crCorrect: 0,
+    specificCorrect: 0,
     latamCorrect: 0,
     bothCorrect: 0,
     bothWrong: 0,
-    onlyCrWrong: 0,
+    onlySpecificWrong: 0,
     onlyLatamWrong: 0,
   };
 
   const samplesBothWrong: string[] = [];
-  const samplesOnlyCrWrong: string[] = [];
+  const samplesOnlySpecificWrong: string[] = [];
   const samplesOnlyLatamWrong: string[] = [];
 
-  for (const fileCR of filesCR) {
-    const fileLATAM = fileCR.replace("_CR.json", "_LATAM.json");
-    const pathCR = path.join(TEST_DIR, fileCR);
-    const pathLATAM = path.join(TEST_DIR, fileLATAM);
+  for (const fileSpecific of filesSpecific) {
+    const fileLATAM = fileSpecific.replace(config.suffix, "_LATAM.json");
+    const pathSpecific = path.join(config.dir, fileSpecific);
+    const pathLATAM = path.join(config.dir, fileLATAM);
 
-    if (!fs.existsSync(pathLATAM)) continue;
+    if (!fs.existsSync(pathLATAM)) {
+      console.warn(`Saltando ${fileSpecific}: No tiene par LATAM.`);
+      continue;
+    }
 
-    for await (const [lineA, lineB] of zipFiles(pathCR, pathLATAM)) {
+    for await (const [lineA, lineB] of zipFiles(pathSpecific, pathLATAM)) {
       const strA = lineA.trim().replace(/^\[|\]$|^,|,$/g, "");
       const strB = lineB.trim().replace(/^\[|\]$|^,|,$/g, "");
 
       if (!strA || !strB) continue;
 
       try {
-        const recCR = JSON.parse(strA);
-        const recLATAM = JSON.parse(strB);
+        const recSpec = JSON.parse(strA);
+        const recLat = JSON.parse(strB);
 
         stats.total++;
-        const crOK = recCR.esCorrecto;
-        const latamOK = recLATAM.esCorrecto;
+        const specOK = recSpec.esCorrecto;
+        const latOK = recLat.esCorrecto;
 
-        if (crOK) stats.crCorrect++;
-        if (latamOK) stats.latamCorrect++;
+        if (specOK) stats.specificCorrect++;
+        if (latOK) stats.latamCorrect++;
 
-        if (crOK && latamOK) {
+        if (specOK && latOK) {
           stats.bothCorrect++;
-        } else if (!crOK && !latamOK) {
+        } else if (!specOK && !latOK) {
           stats.bothWrong++;
           if (samplesBothWrong.length < SAMPLE_LIMIT) {
             samplesBothWrong.push(
-              formatComparison(recCR, recLATAM, "💀 AMBOS FALLAN"),
+              formatComparison(recSpec, recLat, "AMBOS FALLAN"),
             );
           }
-        } else if (!crOK && latamOK) {
-          stats.onlyCrWrong++;
-          if (samplesOnlyCrWrong.length < SAMPLE_LIMIT) {
-            samplesOnlyCrWrong.push(
-              formatComparison(recCR, recLATAM, "❌ CR FALLA"),
+        } else if (!specOK && latOK) {
+          stats.onlySpecificWrong++;
+          if (samplesOnlySpecificWrong.length < SAMPLE_LIMIT) {
+            samplesOnlySpecificWrong.push(
+              formatComparison(recSpec, recLat, "LOCAL FALLA"),
             );
           }
-        } else if (crOK && !latamOK) {
+        } else if (specOK && !latOK) {
           stats.onlyLatamWrong++;
           if (samplesOnlyLatamWrong.length < SAMPLE_LIMIT) {
             samplesOnlyLatamWrong.push(
-              formatComparison(recCR, recLATAM, "⚠️ LATAM FALLA"),
+              formatComparison(recSpec, recLat, "LATAM FALLA"),
             );
           }
         }
@@ -144,49 +175,49 @@ async function analyze() {
     }
   }
 
-  const finalReportPath = getNextReportFileName();
+  const finalReportPath = getReportFilename(countryArg);
 
   const report = `
 ================================================================
-📊 REPORTE DE CALIDAD DETALLADO
+REPORTE DE CALIDAD: ${config.name.toUpperCase()}
 ================================================================
 Fecha: ${new Date().toLocaleString()}
 Total Registros: ${stats.total.toLocaleString()}
 
-🏆 SCOREBOARD GENERAL:
-- CR (Small):    ${((stats.crCorrect / stats.total) * 100).toFixed(4)}%  (✅ ${stats.crCorrect.toLocaleString()})
-- LATAM (Big):   ${((stats.latamCorrect / stats.total) * 100).toFixed(4)}%  (✅ ${stats.latamCorrect.toLocaleString()})
+SCOREBOARD GENERAL:
+- ${config.name} (Optimized):  ${((stats.specificCorrect / stats.total) * 100).toFixed(4)}%  (${stats.specificCorrect.toLocaleString()})
+- LATAM (General):       ${((stats.latamCorrect / stats.total) * 100).toFixed(4)}%  (${stats.latamCorrect.toLocaleString()})
 
-⚖️ BALANZA DE PODER:
+BALANZA DE PODER:
 - Ambos Correctos:      ${stats.bothCorrect.toLocaleString()}
 - Ambos Incorrectos:    ${stats.bothWrong.toLocaleString()} (Morgue Común)
-- CR Gana (Latam Falla): ${stats.onlyLatamWrong.toLocaleString()} (Ruido Latam)
-- LATAM Gana (CR Falla): ${stats.onlyCrWrong.toLocaleString()} (Oportunidad CR)
+- Local Gana (Latam Falla): ${stats.onlyLatamWrong.toLocaleString()} (Ruido Latam evitado)
+- LATAM Gana (Local Falla): ${stats.onlySpecificWrong.toLocaleString()} (Oportunidad de mejora Local)
 
 ================================================================
-1. 💀 LA MORGUE COMÚN (Donde NINGUNO pudo)
+1. LA MORGUE COMÚN (Donde NINGUNO pudo)
    Total: ${stats.bothWrong.toLocaleString()}
 ================================================================
 ${samplesBothWrong.join("\n-----------------------------------------\n")}
 
 ================================================================
-2. ❌ ERRORES EXCLUSIVOS DE CR (Oportunidades de Mejora)
+2. ERRORES EXCLUSIVOS DE ${config.name.toUpperCase()} (Oportunidades de Mejora)
    (Casos donde el diccionario LATAM sí funcionó)
-   Total: ${stats.onlyCrWrong.toLocaleString()}
+   Total: ${stats.onlySpecificWrong.toLocaleString()}
 ================================================================
-${samplesOnlyCrWrong.join("\n-----------------------------------------\n")}
+${samplesOnlySpecificWrong.join("\n-----------------------------------------\n")}
 
 ================================================================
-3. ⚠️ ERRORES EXCLUSIVOS DE LATAM (Ruido Agregado)
-   (Casos donde CR estaba bien, pero LATAM lo rompió)
+3. ERRORES EXCLUSIVOS DE LATAM (Ruido Agregado)
+   (Casos donde Local estaba bien, pero LATAM lo rompió)
    Total: ${stats.onlyLatamWrong.toLocaleString()}
 ================================================================
 ${samplesOnlyLatamWrong.join("\n-----------------------------------------\n")}
 `;
 
   fs.writeFileSync(finalReportPath, report);
-  console.log(`\n\n✅ ANÁLISIS COMPLETO.`);
-  console.log(`📄 Reporte guardado en: ${finalReportPath}`);
+  console.log(`\n\nANÁLISIS COMPLETO.`);
+  console.log(`Reporte guardado en: ${finalReportPath}`);
 }
 
 analyze();

@@ -1,4 +1,8 @@
-import { CR_GIVEN_NAMES } from "./data/givenNames-cr";
+export interface ArbitrationResult {
+  movedToGivenName: boolean;
+  newGivenName: string;
+  newS1: string;
+}
 
 const VALID_SINGLE_LETTERS = new Set(["O", "D", "A"]);
 
@@ -616,14 +620,43 @@ const COMPOUND_WHITELIST = new Set([
 const PARTICLES = /\b(DE|LA|LAS|LOS|DEL|Y|SAN|SANTA|VON|VAN|DA|DI)\b/;
 
 export class SurnameArbitrator {
+  private givenNames: Set<string>;
+  constructor(givenNames?: Set<string>) {
+    this.givenNames = givenNames || new Set();
+  }
+
+  public arbitrate(
+    givenName: string,
+    surnameCandidate: string,
+  ): ArbitrationResult {
+    const s1 = surnameCandidate.trim();
+
+    if (s1.length === 1 && !VALID_SINGLE_LETTERS.has(s1)) {
+      return {
+        movedToGivenName: true,
+        newGivenName: `${givenName} ${s1}`.trim(),
+        newS1: "",
+      };
+    }
+
+    return {
+      movedToGivenName: false,
+      newGivenName: givenName,
+      newS1: surnameCandidate,
+    };
+  }
+
   public isValid(candidate: string, remainingText: string): boolean {
     const upperCandidate = candidate.toUpperCase();
     const parts = upperCandidate.split(" ");
     const remainingTrimmed = remainingText.trim().toUpperCase();
+
     if (COMPOUND_WHITELIST.has(upperCandidate)) return true;
+
     if (parts.some((p) => p.length === 1 && !VALID_SINGLE_LETTERS.has(p))) {
       return false;
     }
+
     if (parts.length >= 2 && parts[0] === "DE" && parts[1] === "MARIA")
       return false;
     if (
@@ -668,19 +701,20 @@ export class SurnameArbitrator {
 
       return true;
     }
+
     if (parts.length === 2) {
       const firstWordOfCompound = parts[0];
-      if (CR_GIVEN_NAMES.has(firstWordOfCompound)) {
+      if (this.givenNames.has(firstWordOfCompound)) {
         if (remainingTrimmed.split(" ").length === 1) {
           const secondWordOfCompound = parts[1];
           if (!COMMON_SURNAMES.has(secondWordOfCompound)) {
             return true;
           }
-
           return false;
         }
       }
     }
+
     if (parts.length === 2) {
       const w1 = parts[0];
       const w2 = parts[1];
@@ -688,6 +722,7 @@ export class SurnameArbitrator {
         return false;
       }
     }
+
     if (GIVEN_NAMES_BLACKLIST.has(parts[0])) return false;
     if (parts.length === 2 && parts[0] === parts[1]) return false;
 

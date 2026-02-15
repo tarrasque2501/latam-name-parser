@@ -12,7 +12,7 @@ export class LatamNameParser {
       .map((s) => s.trim().toUpperCase());
 
     this.compoundSet = new Set(allCompounds);
-    this.arbitrator = new SurnameArbitrator();
+    this.arbitrator = new SurnameArbitrator(options.givenNames);
 
     this.maxCompoundWords = allCompounds.reduce((max, current) => {
       const words = current.split(" ").length;
@@ -31,87 +31,112 @@ export class LatamNameParser {
     const foundS2 = this.findCompoundSuffixOptimized(currentString);
     if (foundS2) {
       s2 = foundS2;
-      currentString = currentString
-        .substring(0, currentString.length - s2.length)
-        .trim();
+      currentString = currentString.slice(0, -s2.length).trim();
       isCompound = true;
     } else {
-      const parts = currentString.split(" ");
-      if (parts.length > 1) {
-        s2 = parts.pop() || "";
-        currentString = parts.join(" ");
+      const lastSpace = currentString.lastIndexOf(" ");
+      if (lastSpace !== -1) {
+        s2 = currentString.slice(lastSpace + 1);
+        currentString = currentString.slice(0, lastSpace);
       }
     }
 
     const foundS1 = this.findCompoundSuffixOptimized(currentString);
     if (foundS1) {
       s1 = foundS1;
-      currentString = currentString
-        .substring(0, currentString.length - s1.length)
-        .trim();
+      currentString = currentString.slice(0, -s1.length).trim();
       isCompound = true;
     } else {
-      const parts = currentString.split(" ");
-      if (parts.length >= 1 && currentString !== "") {
-        s1 = parts.pop() || "";
-        currentString = parts.join(" ");
+      const lastSpace = currentString.lastIndexOf(" ");
+      if (lastSpace !== -1 && currentString.length > 0) {
+        s1 = currentString.slice(lastSpace + 1);
+        currentString = currentString.slice(0, lastSpace);
       }
     }
 
-    let finalGiven = currentString;
-    let finalS1 = s1;
-    let finalS2 = s2;
+    let givenName = currentString;
 
-    if (!finalGiven && finalS1) {
-      finalGiven = finalS1;
-      finalS1 = finalS2;
-      finalS2 = "";
+    if (!givenName && s1) {
+      givenName = s1;
+      s1 = s2;
+      s2 = "";
     }
 
-    const fmtGiven = this.formatTitleCase(finalGiven);
-    const fmtS1 = this.formatTitleCase(finalS1);
-    const fmtS2 = this.formatTitleCase(finalS2);
-    const fmtFull = this.formatTitleCase(originalName);
+    const arbitration = this.arbitrator.arbitrate(givenName, s1);
+    if (arbitration.movedToGivenName) {
+      givenName = arbitration.newGivenName;
+      s1 = arbitration.newS1;
+    }
 
     return {
-      fullName: fmtFull,
-      givenName: fmtGiven,
-      surname1: fmtS1,
-      surname2: fmtS2,
+      fullName: originalName,
+      givenName: givenName,
+      surname1: s1,
+      surname2: s2,
       isCompound,
-      toNatural: function () {
-        return `${this.givenName} ${this.surname1} ${this.surname2}`
-          .replace(/-/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-      },
-      toStandard: function () {
-        const s1Hyphen = this.surname1.replace(/\s+/g, "-");
-        const s2Hyphen = this.surname2.replace(/\s+/g, "-");
-        let united = `${s1Hyphen}-${s2Hyphen}`
-          .replace(/-+/g, "-")
-          .replace(/^-|-$/g, "");
-
-        return `${this.givenName} ${united}`.trim();
-      },
-      toFullHyphen: function () {
-        return `${this.givenName} ${this.surname1} ${this.surname2}`
-          .trim()
-          .replace(/\s+/g, "-")
-          .replace(/-+/g, "-");
-      },
     };
   }
 
-  private formatTitleCase(str: string): string {
+  public static toNatural(parsed: ParsedName): string {
+    const raw = `${parsed.givenName} ${parsed.surname1} ${parsed.surname2}`
+      .replace(/-/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return LatamNameParser.formatTitleCase(raw);
+  }
+
+  public static toStandard(parsed: ParsedName): string {
+    const gn = LatamNameParser.formatTitleCase(parsed.givenName);
+    const s1 = LatamNameParser.formatTitleCase(parsed.surname1).replace(
+      /\s+/g,
+      "-",
+    );
+    const s2 = LatamNameParser.formatTitleCase(parsed.surname2).replace(
+      /\s+/g,
+      "-",
+    );
+
+    const united = `${s1}-${s2}`.replace(/-+/g, "-").replace(/^-|-$/g, "");
+    return `${gn} ${united}`.trim();
+  }
+
+  public static toFullHyphen(parsed: ParsedName): string {
+    const raw = `${parsed.givenName} ${parsed.surname1} ${parsed.surname2}`;
+    return LatamNameParser.formatTitleCase(raw)
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
+  }
+
+  private static formatTitleCase(str: string): string {
     if (!str) return "";
+    const particles = new Set([
+      "DE",
+      "LA",
+      "DEL",
+      "LOS",
+      "LAS",
+      "Y",
+      "DA",
+      "DOS",
+      "DAS",
+      "DO",
+      "VON",
+      "VAN",
+      "DER",
+      "SAN",
+      "SANTA",
+    ]);
     return str
       .toLowerCase()
       .split(" ")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .map((word, index) => {
+        const upper = word.toUpperCase();
+        if (index > 0 && particles.has(upper)) return word.toLowerCase();
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
       .join(" ");
   }
-
   private findCompoundSuffixOptimized(text: string): string | null {
     const tokens = text.split(" ");
     if (tokens.length < 2) return null;
@@ -120,9 +145,10 @@ export class LatamNameParser {
 
     for (let i = maxWordsToCheck; i >= 2; i--) {
       const candidate = tokens.slice(-i).join(" ");
-      const remainingText = tokens.slice(0, tokens.length - i).join(" ");
 
       if (this.compoundSet.has(candidate)) {
+        const remainingText = tokens.slice(0, tokens.length - i).join(" ");
+
         if (this.arbitrator.isValid(candidate, remainingText)) {
           return candidate;
         }
