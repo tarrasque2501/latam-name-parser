@@ -1,5 +1,3 @@
-
-// Diccionario generado automáticamente
 export const CR_GIVEN_NAMES = new Set<string>([
   "LUIS",
   "CARLOS",
@@ -2918,5 +2916,5 @@ export const CR_GIVEN_NAMES = new Set<string>([
   "EDEL",
   "NAYARITH",
   "MAXIMA",
-  "MILENE"
+  "MILENE",
 ]);
