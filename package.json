@@ -22,8 +22,11 @@
     "dist"
   ],
   "devDependencies": {
-    "typescript": "^5.x.x",
+    "@types/node": "^20.x.x",
     "ts-node": "^10.x.x",
-    "@types/node": "^20.x.x"
+    "typescript": "^5.x.x"
+  },
+  "dependencies": {
+    "latam-name-parser": "^1.2.2"
   }
 }

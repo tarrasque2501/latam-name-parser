@@ -1,4 +1,3 @@
-
 // Diccionario generado automáticamente para CR
 export const CR_GIVEN_NAMES = new Set<string>([
   "LUIS",
@@ -3975,6 +3974,7 @@ export const CR_GIVEN_NAMES = new Set<string>([
   "YICEL",
   "JERSAN",
   "SHARY",
+  "JOSE",
   "JOSELLYN",
   "JOSSELIN",
   "KIRSTEN",
@@ -4408,5 +4408,25 @@ export const CR_GIVEN_NAMES = new Set<string>([
   "ROSSI",
   "YEINI",
   "JOSHUAN",
-  "KEYLI"
+  "KEYLI",
+  "MARIA",
+  "LUZ",
+  "ANETTE",
+  "ALEXANDRE",
+  "ABDUL",
+  "RAHMAN",
+  "LEONEL",
+  "AUGUSTO",
+  "YOVANY",
+  "IDANIA",
+  "PAUL",
+  "LAZLO",
+  "GIOVANNA",
+  "YORKELING",
+  "JANNIEL",
+  "MARSELLE",
+  "AMRO",
+  "ABDELGALIL",
+  "YADIRA",
+  "PAOLA",
 ]);

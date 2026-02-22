@@ -4,23 +4,26 @@ import readline from "readline";
 import { performance } from "perf_hooks";
 import { LatamNameParser, Dictionaries } from "../index";
 
-import { CR_GIVEN_NAMES } from "../../src/data/givenNames-cr";
-import { MX_GIVEN_NAMES } from "../../src/data/givenNames-mx";
+import { MX_STRATEGY } from "../../src/data/strategies/mx";
+import { CR_STRATEGY } from "../../src/data/strategies/cr";
+import { CountryStrategy } from "../types";
+
+// (Eliminados los imports directos de GIVEN_NAMES porque ya están dentro de las estrategias)
 
 const CONFIGS: Record<
   string,
-  { name: string; dict: any; givenNames: Set<string>; dir: string }
+  { name: string; dict: any; strategy: CountryStrategy; dir: string }
 > = {
   cr: {
     name: "Costa Rica",
     dict: Dictionaries.CR,
-    givenNames: CR_GIVEN_NAMES,
+    strategy: CR_STRATEGY,
     dir: path.join(__dirname, "../../src/data/test/cr"),
   },
   mx: {
     name: "México",
     dict: Dictionaries.MX,
-    givenNames: MX_GIVEN_NAMES,
+    strategy: MX_STRATEGY,
     dir: path.join(__dirname, "../../src/data/test/mx"),
   },
 };
@@ -35,20 +38,25 @@ interface BenchmarkResult {
 }
 
 async function runBenchmarkForStrategy(
-  config: { name: string; dict: any; givenNames: Set<string>; dir: string },
+  config: { name: string; dict: any; strategy: CountryStrategy; dir: string },
   strategyName: string,
   dictionaries: any[],
   fileSuffix: string,
-  useSpecificNames: boolean,
+  // useSpecificNames: boolean, // <-- Ya no necesitamos este flag porque la estrategia siempre va incluida
 ): Promise<BenchmarkResult> {
   console.log(`\nINICIANDO TEST: ${strategyName}`);
 
   const setupStart = performance.now();
 
+  // --- CORRECCIÓN QUIRÚRGICA AQUÍ ---
+  // Eliminamos 'givenNames' y pasamos solo 'strategy'.
+  // Ahora el parser siempre tendrá el contexto cultural correcto (MX o CR)
+  // y lo que comparamos es la potencia del diccionario de apellidos (Local vs LATAM).
   const parser = new LatamNameParser({
     dictionaries,
-    givenNames: useSpecificNames ? config.givenNames : undefined,
+    strategy: config.strategy,
   });
+  // ----------------------------------
 
   const setupTime = performance.now() - setupStart;
   console.log(`Carga del Parser: ${setupTime.toFixed(2)} ms`);
@@ -171,7 +179,7 @@ async function main() {
       `${config.name} (Optimized)`,
       [config.dict],
       `_${countryArg.toUpperCase()}`,
-      true,
+      // true, // Eliminado
     );
 
     const resultsLATAM = await runBenchmarkForStrategy(
@@ -179,7 +187,7 @@ async function main() {
       "LATAM (Grande)",
       [Dictionaries.LATAM],
       "_LATAM",
-      false,
+      // false, // Eliminado
     );
 
     console.log("\n\n========================================================");

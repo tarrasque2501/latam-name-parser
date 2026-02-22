@@ -18,6 +18,7 @@ const CONFIGS: Record<string, { name: string; dir: string; suffix: string }> = {
 };
 
 const SAMPLE_LIMIT = 50;
+const OFFENDERS_LIMIT = 50;
 
 function getReportFilename(countryCode: string): string {
   const baseName = `final_report_${countryCode.toUpperCase()}`;
@@ -28,6 +29,19 @@ function getReportFilename(countryCode: string): string {
   while (fs.existsSync(fullPath)) {
     counter++;
     fileName = `${baseName}_${counter}.txt`;
+    fullPath = path.join(DATA_ROOT, fileName);
+  }
+  return fullPath;
+}
+
+function getCsvFilename(countryCode: string): string {
+  const baseName = `failures_${countryCode.toUpperCase()}`;
+  let fileName = `${baseName}.csv`;
+  let fullPath = path.join(DATA_ROOT, fileName);
+  let counter = 0;
+  while (fs.existsSync(fullPath)) {
+    counter++;
+    fileName = `${baseName}_${counter}.csv`;
     fullPath = path.join(DATA_ROOT, fileName);
   }
   return fullPath;
@@ -115,6 +129,16 @@ async function analyze() {
   const samplesOnlySpecificWrong: string[] = [];
   const samplesOnlyLatamWrong: string[] = [];
 
+  // 🔥 DETECTOR DE VILLANOS (Compuestos perdidos)
+  const missingCompounds = new Map<string, number>();
+
+  // 📉 PREPARAR CSV
+  const csvPath = getCsvFilename(countryArg);
+  const csvStream = fs.createWriteStream(csvPath, { encoding: "utf-8" });
+  csvStream.write(
+    "TIPO_ERROR,NOMBRE_COMPLETO,ESP_N,ESP_AP1,ESP_AP2,LOC_N,LOC_AP1,LOC_AP2\n",
+  );
+
   for (const fileSpecific of filesSpecific) {
     const fileLATAM = fileSpecific.replace(config.suffix, "_LATAM.json");
     const pathSpecific = path.join(config.dir, fileSpecific);
@@ -142,27 +166,61 @@ async function analyze() {
         if (specOK) stats.specificCorrect++;
         if (latOK) stats.latamCorrect++;
 
+        let errorType = "";
+
         if (specOK && latOK) {
           stats.bothCorrect++;
-        } else if (!specOK && !latOK) {
-          stats.bothWrong++;
-          if (samplesBothWrong.length < SAMPLE_LIMIT) {
-            samplesBothWrong.push(
-              formatComparison(recSpec, recLat, "AMBOS FALLAN"),
-            );
+        } else {
+          // Clasificación del error para el CSV y Reporte
+          if (!specOK && !latOK) {
+            stats.bothWrong++;
+            errorType = "AMBOS_FALLAN";
+            if (samplesBothWrong.length < SAMPLE_LIMIT) {
+              samplesBothWrong.push(
+                formatComparison(recSpec, recLat, "💀 AMBOS FALLAN"),
+              );
+            }
+          } else if (!specOK && latOK) {
+            stats.onlySpecificWrong++;
+            errorType = "LOCAL_FALLA";
+            if (samplesOnlySpecificWrong.length < SAMPLE_LIMIT) {
+              samplesOnlySpecificWrong.push(
+                formatComparison(recSpec, recLat, "⚠️ LOCAL FALLA"),
+              );
+            }
+          } else if (specOK && !latOK) {
+            stats.onlyLatamWrong++;
+            errorType = "LATAM_FALLA";
+            if (samplesOnlyLatamWrong.length < SAMPLE_LIMIT) {
+              samplesOnlyLatamWrong.push(
+                formatComparison(recSpec, recLat, "✅ LOCAL GANA"),
+              );
+            }
           }
-        } else if (!specOK && latOK) {
-          stats.onlySpecificWrong++;
-          if (samplesOnlySpecificWrong.length < SAMPLE_LIMIT) {
-            samplesOnlySpecificWrong.push(
-              formatComparison(recSpec, recLat, "LOCAL FALLA"),
-            );
-          }
-        } else if (specOK && !latOK) {
-          stats.onlyLatamWrong++;
-          if (samplesOnlyLatamWrong.length < SAMPLE_LIMIT) {
-            samplesOnlyLatamWrong.push(
-              formatComparison(recSpec, recLat, "LATAM FALLA"),
+
+          // 🔥 ANÁLISIS FORENSE: ¿Por qué falló el local?
+          // Buscamos apellidos compuestos que debieron ser detectados pero no lo fueron.
+          if (!specOK) {
+            const espAp1 = recSpec.esperado.ap1.trim();
+            const espAp2 = recSpec.esperado.ap2.trim();
+
+            // Si el apellido esperado tiene espacios (es compuesto), y fallamos, es un candidato a Whitelist.
+            if (espAp1.includes(" ")) {
+              missingCompounds.set(
+                espAp1,
+                (missingCompounds.get(espAp1) || 0) + 1,
+              );
+            }
+            if (espAp2.includes(" ")) {
+              missingCompounds.set(
+                espAp2,
+                (missingCompounds.get(espAp2) || 0) + 1,
+              );
+            }
+
+            // Escribir en CSV
+            csvStream.write(
+              `${errorType},"${recSpec.nombreCompleto}","${recSpec.esperado.n}","${recSpec.esperado.ap1}","${recSpec.esperado.ap2}","${recSpec.obtenido.n}","${recSpec.obtenido.ap1}","${recSpec.obtenido.ap2}"\n`,
             );
           }
         }
@@ -175,40 +233,58 @@ async function analyze() {
     }
   }
 
+  csvStream.end();
+
+  // Generar ranking de villanos
+  const topOffenders = Array.from(missingCompounds.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, OFFENDERS_LIMIT)
+    .map(
+      ([name, count], idx) =>
+        `${idx + 1}. [${name}] - Causa ${count.toLocaleString()} errores`,
+    );
+
   const finalReportPath = getReportFilename(countryArg);
 
   const report = `
 ================================================================
-REPORTE DE CALIDAD: ${config.name.toUpperCase()}
+📊 REPORTE DE CALIDAD: ${config.name.toUpperCase()}
 ================================================================
 Fecha: ${new Date().toLocaleString()}
 Total Registros: ${stats.total.toLocaleString()}
 
-SCOREBOARD GENERAL:
-- ${config.name} (Optimized):  ${((stats.specificCorrect / stats.total) * 100).toFixed(4)}%  (${stats.specificCorrect.toLocaleString()})
-- LATAM (General):       ${((stats.latamCorrect / stats.total) * 100).toFixed(4)}%  (${stats.latamCorrect.toLocaleString()})
+🏆 SCOREBOARD GENERAL:
+- ${config.name} (Optimized):  ${((stats.specificCorrect / stats.total) * 100).toFixed(4)}%  (✅ ${stats.specificCorrect.toLocaleString()})
+- LATAM (General):       ${((stats.latamCorrect / stats.total) * 100).toFixed(4)}%  (✅ ${stats.latamCorrect.toLocaleString()})
 
-BALANZA DE PODER:
+⚖️ BALANZA DE PODER:
 - Ambos Correctos:      ${stats.bothCorrect.toLocaleString()}
 - Ambos Incorrectos:    ${stats.bothWrong.toLocaleString()} (Morgue Común)
 - Local Gana (Latam Falla): ${stats.onlyLatamWrong.toLocaleString()} (Ruido Latam evitado)
 - LATAM Gana (Local Falla): ${stats.onlySpecificWrong.toLocaleString()} (Oportunidad de mejora Local)
 
 ================================================================
-1. LA MORGUE COMÚN (Donde NINGUNO pudo)
+1. 🕵️‍♂️ LOS MÁS BUSCADOS (Top Offenders)
+   (Apellidos compuestos que rompieron al parser local)
+   Agregar estos a la Whitelist arreglará miles de casos.
+================================================================
+${topOffenders.length > 0 ? topOffenders.join("\n") : "¡No se detectaron patrones claros de compuestos faltantes!"}
+
+================================================================
+2. 💀 LA MORGUE COMÚN (Donde NINGUNO pudo)
    Total: ${stats.bothWrong.toLocaleString()}
 ================================================================
 ${samplesBothWrong.join("\n-----------------------------------------\n")}
 
 ================================================================
-2. ERRORES EXCLUSIVOS DE ${config.name.toUpperCase()} (Oportunidades de Mejora)
+3. ⚠️ ERRORES EXCLUSIVOS DE ${config.name.toUpperCase()} (Oportunidades de Mejora)
    (Casos donde el diccionario LATAM sí funcionó)
    Total: ${stats.onlySpecificWrong.toLocaleString()}
 ================================================================
 ${samplesOnlySpecificWrong.join("\n-----------------------------------------\n")}
 
 ================================================================
-3. ERRORES EXCLUSIVOS DE LATAM (Ruido Agregado)
+4. ✅ ERRORES EXCLUSIVOS DE LATAM (Ruido Agregado)
    (Casos donde Local estaba bien, pero LATAM lo rompió)
    Total: ${stats.onlyLatamWrong.toLocaleString()}
 ================================================================
@@ -216,8 +292,9 @@ ${samplesOnlyLatamWrong.join("\n-----------------------------------------\n")}
 `;
 
   fs.writeFileSync(finalReportPath, report);
-  console.log(`\n\nANÁLISIS COMPLETO.`);
-  console.log(`Reporte guardado en: ${finalReportPath}`);
+  console.log(`\n\n✅ ANÁLISIS COMPLETO.`);
+  console.log(`📄 Reporte texto: ${finalReportPath}`);
+  console.log(`📊 Reporte CSV:   ${csvPath}`);
 }
 
 analyze();
