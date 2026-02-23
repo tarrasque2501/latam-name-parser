@@ -1,3 +1,11 @@
+export type NameFormat = "natural" | "surname-first";
+export type OutputFormat = "hyphenated-full" | "hyphenated-surname" | "natural";
+
+export interface ParseOptions {
+  format?: NameFormat;
+  expectedSurnames?: 1 | 2;
+}
+
 export interface ParsedName {
   fullName: string;
   givenName: string;
@@ -5,8 +13,6 @@ export interface ParsedName {
   surname2: string;
   isCompound: boolean;
 }
-
-export type OutputFormat = "hyphenated-full" | "hyphenated-surname" | "natural";
 
 export interface AnglicizedName {
   givenName: string;
@@ -16,5 +22,14 @@ export interface AnglicizedName {
 
 export interface LatamParserOptions {
   dictionaries: string[][];
+  strategy: CountryStrategy;
   debug?: boolean;
+}
+
+export interface CountryStrategy {
+  commonSurnames: Set<string>;
+  givenNamesBlacklist: Set<string>;
+  compoundWhitelist: Set<string>;
+  ambiguousSurnames?: Set<string>;
+  givenNames: Set<string>;
 }

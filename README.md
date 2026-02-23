@@ -4,10 +4,11 @@
 [![Downloads](https://img.shields.io/npm/dt/latam-name-parser?style=for-the-badge&color=green)](https://www.npmjs.com/package/latam-name-parser)
 [![License](https://img.shields.io/npm/l/latam-name-parser?style=for-the-badge&color=orange)](https://github.com/tarrasque2501/latam-name-parser/blob/main/LICENSE)
 
-> **New in v1.1.1:** Major accuracy boost! We have successfully stress-tested the parser against **4,094,359 real records** (full Costa Rica Electoral Roll).
+> **New in v1.3.0:** Massive performance and feature update!
 >
-> - **Accuracy:** 99.9928% (Only 295 edge cases out of 4.1 million).
-> - **Speed:** ~112,000 names/second.
+> - Speed: Rebuilt with a Zero-Allocation C++ Regex bypass, achieving >160,000 records/second.
+> - Multi-Country Support: Dedicated parsing strategies for Mexico, Argentina, Costa Rica, and any incoming countrys.
+> - New Parsing Modes: Support for surname-first (inverted) formats and 1-surname models.
 
 A specialized, high-performance parser designed for the complexity of **Latin American identities**. Unlike simple splitters, it uses a **"Reverse Subtraction"** strategy and regionally-mined dictionaries to correctly identify compound surnames (e.g., _De La O_, _Montes de Oca_) and dual surnames.
 
@@ -17,11 +18,11 @@ A specialized, high-performance parser designed for the complexity of **Latin Am
 
 This library isn't just based on grammatical rules; it is **data-mined**. We validate our logic against massive, real-world government datasets to ensure production readiness.
 
-| Metric         | Result                 | Dataset                                                     |
-| :------------- | :--------------------- | :---------------------------------------------------------- |
-| **Accuracy**   | **99.9928%**           | Costa Rica Padron Electoral (4.1M records)                  |
-| **Speed**      | **~112,000 names/sec** | Single-threaded, Node.js v20                                |
-| **Edge Cases** | **< 0.008%**           | Mostly typos in official registries or rare religious names |
+| Country / Dataset   | Records Evaluated | Accuracy (LATAM) | Accuracy (Optimized) | Speed (Req/Sec)   |
+| :------------------ | :---------------- | :--------------- | :------------------- | :---------------- |
+| Argentina (RENAPER) | ~14.6 Million     | 99.9998%         | 97.74%               | 166,300 names/sec |
+| Costa Rica (TSE)    | ~4.1 Million      | 99.6990%         | 99.9953%             | 160,469 names/sec |
+| Mexico (INE)        | ~20.0 Million     | TBD              | TBD                  | TBD names/sec     |
 
 ---
 
@@ -38,20 +39,22 @@ npm install latam-name-parser
 ## Usage
 
 **Basic Implementation**
-Import the parser and use the LATAM dictionary set for maximum coverage across all supported countries.
+To use the parser, you must instantiate it by providing a Dictionary and a Country Strategy. This ensures the parser knows how to handle region-specific compound names and ambiguous cases.
+
+### Option A: Full LATAM Coverage
+
+Use the combined `LATAM` dictionary if your database contains people from all over Latin America.
 
 ```
-import { LatamNameParser, Dictionaries } from "latam-name-parser";
+import { LatamNameParser, Dictionaries, MX_STRATEGY } from "latam-name-parser";
 
-// Initialize with full Latin American coverage
+// We use MX_STRATEGY as a robust default, but feed it the entire LATAM dictionary
 const parser = new LatamNameParser({
-dictionaries: [Dictionaries.LATAM]
+  dictionaries: [Dictionaries.LATAM],
+  strategy: MX_STRATEGY
 });
 
-const input = "MARIA DEL CARMEN GUTIERREZ DE PIÑERES RENAULD";
-const parsed = parser.parse(input);
-
-console.log(parsed);
+const parsed = parser.parse("MARIA DEL CARMEN GUTIERREZ DE PIÑERES RENAULD");
 ```
 
 ```
@@ -64,19 +67,76 @@ Output:{
 }
 ```
 
-Performance Optimization (Specific Countries)
-If you only need to process data from a specific region (e.g., Costa Rica), you can load only that dictionary to gain a slight performance boost and reduce "noise" from other regions.
+### Option B: Single Country (Maximum Performance)
+
+If you know your data comes from a specific country, load only that dictionary. This uses less RAM and makes the parser even faster.
 
 ```
-import { LatamNameParser, Dictionaries } from "latam-name-parser";
+import { LatamNameParser, Dictionaries, CR_STRATEGY } from "latam-name-parser";
 
-// Optimized for Costa Rica (CR)
-const parser = new LatamNameParser({
-dictionaries: [Dictionaries.CR]
+const parserCr = new LatamNameParser({
+  dictionaries: [Dictionaries.CR], // Only loads Costa Rican surnames
+  strategy: CR_STRATEGY
+});
+```
+
+### Option C: Custom Combinations
+
+Because dictionaries is an array, you can mix and match to support specific regions without loading the entire LATAM database.
+
+```
+import { LatamNameParser, Dictionaries, AR_STRATEGY } from "latam-name-parser";
+
+const customParser = new LatamNameParser({
+  // Loads both Argentina and Mexico dictionaries
+  dictionaries: [Dictionaries.AR, Dictionaries.MX],
+  strategy: AR_STRATEGY
+});
+```
+
+---
+
+## Advanced Parse Options (New):
+
+The .parse() method now accepts a second argument: ParseOptions. This allows you to handle edge cases found in unstructured databases.
+
+- Inverted Format (Surname-First)
+  Many legacy databases store names as [S1] [S2] [Names]. You can tell the parser to evaluate from left-to-right:
+
+```
+const input = "DE LA CRUZ DEL VALLE MARIA DE LOS ANGELES";
+
+const result = parser.parse(input, {
+  format: "surname-first"
 });
 
-const result = parser.parse("JUAN CARLOS DE LA O VARGAS");
-// Result: { givenName: "JUAN CARLOS", surname1: "DE LA O", surname2: "VARGAS" }
+// Result:
+// givenName: "MARIA DE LOS ANGELES"
+// surname1: "DE LA CRUZ"
+// surname2: "DEL VALLE"
+
+```
+
+- Single Surname Systems (e.g., Argentina)
+  Some countries officially use only one surname. You can instruct the parser to strictly protect the first surname and dump the rest into the given name.
+
+```
+import { AR_STRATEGY } from "latam-name-parser";
+
+const parserAr = new LatamNameParser({
+  dictionaries: [Dictionaries.AR],
+  strategy: AR_STRATEGY
+});
+
+const result = parserAr.parse("JUAN CARLOS MARTIN DEL CAMPO", {
+  expectedSurnames: 1
+});
+
+// Result:
+// givenName: "JUAN CARLOS"
+// surname1: "MARTIN DEL CAMPO"
+// surname2: ""
+
 ```
 
 ---
@@ -85,24 +145,24 @@ const result = parser.parse("JUAN CARLOS DE LA O VARGAS");
 
 The Anglicized Output Formats were designed to solve a common problem: many international systems do not handle spaces in surnames or dual surnames well. These formats provide different ways to represent the parsed name to ensure compatibility with various software requirements.
 
-- `Natural`: Juan Carlos De La O Vargas
+- `Natural`: Juan Carlos De La O Vargas (Remove "-" symbols)
 - `Standard`: Juan Carlos De-La-O-Vargas (Ideal for Database integrity)
-- `Full-Hyphen`: Juan-Carlos De-La-O-Vargas (Ideal for emails/slugs)
+- `Full-Hyphen`: Juan-Carlos-De-La-O-Vargas (Ideal for emails/slugs)
 
 ```
-import { LatamNameParser, Dictionaries } from "latam-name-parser";
+const parsed = parser.parse("JUAN CARLOS DE LA O VARGAS");
 
-const parser = new LatamNameParser({ dictionaries: [Dictionaries.CR] });
-const input = "Juan Carlos De La O Vargas";
-const parsed = parser.parse(input);
+// 1. Natural: Title-cased and cleaned of extra spaces
+console.log(LatamNameParser.toNatural(parsed));
+// "Juan Carlos De La O Vargas"
 
-// givenName: "Juan Carlos"
-// surname1: "De La O" (Saved by our VALID_SINGLE_LETTERS rule)
-// surname2: "Vargas"
+// 2. Standard: Hyphenates the surnames to trick US systems into reading it as a single Last Name
+console.log(LatamNameParser.toStandard(parsed));
+// "Juan Carlos De-La-O-Vargas"
 
-console.log(parsed.toNatural());
-console.log(parsed.toStandard());
-console.log(parsed.toFullHyphen());
+// 3. Full-Hyphen: Hyphenates the entire name (Useful for URL slugs or strict ID systems)
+console.log(LatamNameParser.toFullHyphen(parsed));
+// "Juan-Carlos-De-La-O-Vargas"
 
 ```
 

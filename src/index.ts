@@ -3,6 +3,7 @@ import surnamesAr from "./data/surnames-ar.json";
 import surnamesMx from "./data/surnames-mx.json";
 
 export * from "./types";
+export { LatamNameParser } from "./LatamNameParser";
 export const Dictionaries = {
   CR: surnamesCr,
   AR: surnamesAr,
@@ -11,4 +12,6 @@ export const Dictionaries = {
     (a, b) => b.length - a.length,
   ),
 };
-export { LatamNameParser } from "./LatamNameParser";
+export { CR_STRATEGY } from "./data/strategies/cr";
+export { AR_STRATEGY } from "./data/strategies/ar";
+export { MX_STRATEGY } from "./data/strategies/mx";

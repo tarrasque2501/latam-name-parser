@@ -1,629 +1,80 @@
-import { CR_GIVEN_NAMES } from "./data/givenNames-cr";
+import { CountryStrategy } from "./types";
+
+export interface ArbitrationResult {
+  movedToGivenName: boolean;
+  newGivenName: string;
+  newS1: string;
+}
 
 const VALID_SINGLE_LETTERS = new Set(["O", "D", "A"]);
-
-const COMMON_SURNAMES = new Set([
-  "ROJAS",
-  "VARGAS",
-  "JIMENEZ",
-  "MORA",
-  "CASTRO",
-  "RODRIGUEZ",
-  "SANCHEZ",
-  "HERNANDEZ",
-  "PEREZ",
-  "GONZALEZ",
-  "RAMIREZ",
-  "MARTINEZ",
-  "SOTO",
-  "SALAZAR",
-  "CRUZ",
-  "ALVARO",
-  "ALFARO",
-  "LOPEZ",
-  "GARCIA",
-  "MORALES",
-  "RUIZ",
-  "TORRES",
-  "RIVERA",
-  "FLORES",
-  "GOMEZ",
-  "DIAZ",
-  "REYES",
-  "HERRERA",
-  "MENDEZ",
-  "GUZMAN",
-  "AGUILAR",
-  "ALVAREZ",
-  "CASTILLO",
-  "SANDOVAL",
-  "ORTIZ",
-  "CHAVEZ",
-  "RIVAS",
-  "CALDERON",
-  "CAMPOS",
-  "CORDERO",
-  "AMADOR",
-  "BLANCO",
-  "DELGADO",
-  "VALVERDE",
-  "MURILLO",
-  "UMAÑA",
-  "ARAYA",
-  "BRENES",
-  "LEON",
-  "ELIZONDO",
-  "VILLALOBOS",
-  "SOLIS",
-  "SALAS",
-  "ROBLES",
-  "ZAMORA",
-  "ARIAS",
-  "FERNANDEZ",
-  "MADRIGAL",
-  "ZUÑIGA",
-  "VEGA",
-  "ACUÑA",
-  "MOLINA",
-  "ARCE",
-  "NAVARRO",
-  "QUESADA",
-  "OBANDO",
-  "PORRAS",
-  "FALLAS",
-  "MONGE",
-  "QUIRÓS",
-  "QUIROS",
-  "VASQUEZ",
-  "GUTIERREZ",
-  "ORTEGA",
-  "CHACON",
-  "SEGURA",
-  "GRANADOS",
-  "BARRANTES",
-  "CASCANTE",
-  "HIDALGO",
-  "OVIEDO",
-  "ESPINOZA",
-  "FONSECA",
-  "AGUERO",
-  "CARRERA",
-  "NUÑEZ",
-  "SOLANO",
-  "VENERAS",
-  "GUERRERO",
-  "LOAIZA",
-  "PADILLA",
-  "CORTES",
-  "SAENZ",
-  "SIBAJA",
-  "CERDAS",
-  "DURAN",
-  "MESEN",
-  "LEIVA",
-  "VILLALTA",
-  "VALERIO",
-  "SEQUEIRA",
-  "MARIN",
-  "RIOS",
-  "BONILLA",
-  "MENA",
-  "NARANJO",
-  "SANDI",
-  "CALVO",
-  "PIEDRA",
-  "ROMERO",
-  "ESQUIVEL",
-  "VARELA",
-  "MONTERO",
-  "AVILA",
-  "ANGULO",
-  "PALMA",
-  "GARRO",
-  "SABORIO",
-  "ALVARADO",
-  "ARROYO",
-  "BOGANTES",
-  "BOLANOS",
-  "BOLAÑOS",
-  "CABALCETA",
-  "CABALLERO",
-  "CAMBRONERO",
-  "CARVAJAL",
-  "CENTENO",
-  "CONEJO",
-  "CORRALES",
-  "CUBERO",
-  "ESCALANTE",
-  "FAJARDO",
-  "GAMBOA",
-  "GAYTAN",
-  "GUEVARA",
-  "GUILLEN",
-  "HERRA",
-  "JARQUIN",
-  "JEREZ",
-  "LEDESMA",
-  "LEITON",
-  "LIZANO",
-  "LORIA",
-  "MACHADO",
-  "MAIRENA",
-  "MANZANARES",
-  "MARCHEN",
-  "MATAMOROS",
-  "MAYORGA",
-  "MEDINA",
-  "MEJIA",
-  "MEMBRENO",
-  "MENDIETA",
-  "MENDOZA",
-  "MERCADO",
-  "MIRANDA",
-  "MONDRAGON",
-  "MONESTEL",
-  "MONTIEL",
-  "MONTOYA",
-  "MORERA",
-  "MUÑOZ",
-  "OCHOA",
-  "OLIVAS",
-  "OROZCO",
-  "PACHECO",
-  "PANIAGUA",
-  "PARRA",
-  "PASTRANA",
-  "PAVON",
-  "PEÑA",
-  "PERALTA",
-  "PERAZA",
-  "PEREIRA",
-  "PICADO",
-  "PINEDA",
-  "PINTO",
-  "PIZARRO",
-  "PORTILLO",
-  "POVEDA",
-  "POWELL",
-  "PRADO",
-  "PRENDAS",
-  "QUINTANA",
-  "QUINTERO",
-  "RAMOS",
-  "RAUDALES",
-  "RAVENEAU",
-  "RAYO",
-  "REID",
-  "ROCA",
-  "ROCH",
-  "ROLDAN",
-  "ROMAN",
-  "ROSALES",
-  "ROSAS",
-  "SAINZ",
-  "SALGADO",
-  "SALGUERO",
-  "SALINAS",
-  "SAMUDIO",
-  "SANABRIA",
-  "SANN",
-  "SANTAMARIA",
-  "SANTANA",
-  "SANTIAGO",
-  "SANTOS",
-  "SARAVIA",
-  "SARMIENTO",
-  "SAUCEDA",
-  "SEAVAS",
-  "SEGOVIA",
-  "SEIRA",
-  "SELEN",
-  "SERRANO",
-  "SEVILLA",
-  "SIERRA",
-  "SILES",
-  "SILVA",
-  "SILVEIRA",
-  "SOLERA",
-  "SOLORZANO",
-  "SOSA",
-  "SOTOMAYOR",
-  "SOJO",
-  "SUAREZ",
-  "SUAZO",
-  "TALLA",
-  "TANN",
-  "TATA",
-  "TEJADA",
-  "TELLEZ",
-  "TENORIO",
-  "TERAN",
-  "TERCER",
-  "TINOC",
-  "TOBAR",
-  "TOLEDO",
-  "TORUÑO",
-  "TREJOS",
-  "TRANA",
-  "TRUJILLO",
-  "ULLOA",
-  "URBINA",
-  "UREÑA",
-  "URIARTE",
-  "URRUTIA",
-  "VALDEZ",
-  "VALDIVIA",
-  "VALENCIA",
-  "VALERIN",
-  "VALLE",
-  "VALLEJOS",
-  "VELASQUEZ",
-  "VENEGAS",
-  "VERA",
-  "VIALES",
-  "VICENTE",
-  "VÍQUEZ",
-  "VIQUEZ",
-  "VILLAGRA",
-  "VILLANUEVA",
-  "VILLARREAL",
-  "VILLEGAS",
-  "VINDAS",
-  "VIVAS",
-  "VIVEROS",
-  "WILLIAMS",
-  "WILSON",
-  "WONG",
-  "WOOD",
-  "WRIGHT",
-  "ZAMB",
-  "ZAPATA",
-  "ZELEDON",
-  "ZEPEDA",
-  "MEZA",
-  "GALLO",
-  "ABARCA",
-  "AGUIRRE",
-  "FUENTES",
-  "NAVARRETE",
-  "CARMONA",
-  "IGLESIAS",
-  "CORONEL",
-  "CARRILLO",
-  "ARAGON",
-  "UGALDE",
-  "MORENO",
-  "ESTRADA",
-  "GUIDO",
-  "CISNEROS",
-  "CORNEJO",
-  "LARIOS",
-  "SANCHO",
-  "CARRANZA",
-  "LARA",
-  "LEAL",
-  "BADILLA",
-  "AVALOS",
-  "CHAVARRIA",
-  "MONTERROSA",
-  "MAGDALENA",
-  "MARTIN",
-  "MATILDE",
-  "ENRIQUE",
-  "ELIAS",
-  "OCAMPO",
-  "ACOSTA",
-  "CAMACHO",
-  "MATA",
-  "DAVILA",
-  "CARDENAS",
-  "GAMEZ",
-  "VAZQUEZ",
-  "VELAZQUEZ",
-  "MONTANARO",
-  "MEDRANO",
-  "UGARTE",
-  "GIL",
-  "BRAVO",
-  "MONTENEGRO",
-  "BELTRAN",
-  "BERMUDEZ",
-  "PAEZ",
-  "MONTES",
-  "FRANCO",
-  "SOTELA",
-  "BREALEY",
-  "BAKER",
-  "JOSEPH",
-  "LUNA",
-  "PRADA",
-  "MERINO",
-  "AMAYA",
-  "ARRIETA",
-  "LI",
-  "CHEN",
-  "PAIZ",
-  "HAAR",
-  "DER",
-  "VAN",
-  "TERCERO",
-  "JUAREZ",
-  "LOBO",
-  "BARRIOS",
-  "GUERRA",
-  "PALACIOS",
-  "CONDE",
-  "CERVANTES",
-  "PELAEZ",
-  "AGUILERA",
-  "ALTAMIRANO",
-  "BETANCOURT",
-  "MELENDEZ",
-  "CASTAÑEDA",
-  "PARDO",
-  "ASIS",
-  "GARZON",
-  "SHELEBY",
-  "BUSTAMANTE",
-  "CORREA",
-  "PASTOR",
-  "LEDERMAN",
-  "OU",
-  "YANG",
-  "OREAMUNO",
-  "MAJLATON",
-  "LARRABURE",
-  "HEGEDUS",
-  "PAL",
-  "RIBAS",
-  "SEEVERS",
-  "FUSCALDO",
-  "HURTADO",
-  "GARAYAR",
-  "WEDEL",
-  "PIÑA",
-  "CHING",
-  "DOMINGUEZ",
-  "ESCOBAR",
-  "CANO",
-  "ALEMAN",
-  "GALLEGOS",
-  "RETANA",
-  "GALLARDO",
-  "GODINEZ",
-  "ASTORGA",
-  "PORTILLA",
-  "VASCONCELOS",
-  "BARRERA",
-  "LEDEZMA",
-  "ZARATE",
-  "ANDRADE",
-  "VIDAL",
-]);
-
-const GIVEN_NAMES_BLACKLIST = new Set([
-  "MARIA",
-  "JOSE",
-  "LUIS",
-  "ANGEL",
-  "ANTONIO",
-  "MARIO",
-  "ANA",
-  "JUAN",
-  "CARLOS",
-  "FRANCISCO",
-  "PEDRO",
-  "JESUS",
-  "MANUEL",
-  "MIGUEL",
-  "ROSA",
-  "CARMEN",
-  "LUZ",
-  "ELENA",
-  "GLORIA",
-  "TERESA",
-  "ALBERTO",
-  "RAFAEL",
-  "DAVID",
-  "VICTOR",
-  "JORGE",
-  "JULIO",
-  "RAMON",
-  "ANDRES",
-  "RICARDO",
-  "ROBERTO",
-  "MARTA",
-  "JULIETA",
-  "GERARDO",
-  "SANDRA",
-  "EDGAR",
-  "WALTER",
-  "EVA",
-  "ADELA",
-  "PATRICIA",
-  "FLOR",
-  "EMILIA",
-  "NORMA",
-  "NORMAN",
-  "OSCAR",
-  "VIVIAN",
-  "DOLORES",
-  "CELSO",
-  "JUANA",
-  "DINORAH",
-  "ALEJANDRO",
-  "LEON",
-  "SARAY",
-  "JAIME",
-  "ANITA",
-  "MARCELA",
-  "MARINOVA",
-  "ROLANDO",
-  "LETICIA",
-  "ZULEMA",
-  "ADOLFO",
-  "ALEXIS",
-  "VERA",
-  "HELIODORA",
-  "WILLIAM",
-  "RODOLFO",
-  "RAUL",
-  "SERGIO",
-  "ISAIAS",
-  "OLGA",
-  "JULIA",
-  "ALI",
-  "LUCRECIA",
-  "ALEXANDRA",
-  "ADRIAN",
-  "SHIRLEY",
-  "JEFFRY",
-  "JOHNNY",
-  "HENRY",
-  "STEPHAN",
-  "KAHHO",
-  "CATERINA",
-  "PAMELA",
-  "MONTSERRAT",
-  "YANIRA",
-  "CESAR",
-  "JENNIFER",
-  "BIANKA",
-  "ANNA",
-  "EUGENIO",
-  "HANNIA",
-  "SOCORRO",
-  "PAULA",
-  "YADIRA",
-  "JUDITH",
-  "CELESTE",
-  "GABRIELA",
-  "MELISSA",
-  "SEBASTIAN",
-  "KELIA",
-  "IRENE",
-  "LUCIA",
-  "ADRIANA",
-  "CONCEPCION",
-  "YORLENI",
-  "TOMAS",
-  "EDUARDO",
-  "MAURICIO",
-  "SOL",
-  "PABLO",
-  "KATHERINE",
-  "MARLON",
-  "ANGIE",
-  "PAOLA",
-  "SOFIA",
-  "CELIA",
-  "MONICA",
-  "CRISTINA",
-  "EMANUEL",
-  "FERNANDA",
-  "KARIME",
-  "NATHALY",
-  "KAYIN",
-  "HERCULANO",
-  "GENESIS",
-  "FELIPE",
-  "ALONDRA",
-  "MARY",
-  "JEDIDAS",
-  "DELA",
-  "VALERIA",
-  "ANNIELA",
-  "ANDREA",
-  "BEATRIZ",
-  "GERSON",
-  "DIEGO",
-  "MARIAN",
-  "ANGELLA",
-  "SAMANTHA",
-  "GABRIEL",
-  "NAYADE",
-  "FRANKLIN",
-  "KRISTEL",
-  "KEVIN",
-  "ALEX",
-  "CAROLINA",
-  "DEREK",
-  "ARIEL",
-  "HALEY",
-  "KIHARA",
-  "AMANDA",
-  "GISELLE",
-  "ZIV",
-  "GUILLERMO",
-  "FERNANDO",
-  "JOHAN",
-  "BRIGITH",
-  "ANGELO",
-  "DANIELA",
-  "TAMARA",
-  "PAZ",
-  "ELIZABETH",
-  "FLORY",
-  "ELSIE",
-  "JEANNETTE",
-  "DANIEL",
-  "ESTEBAN",
-  "BERNAL",
-  "ALEXANDER",
-  "MILCIADES",
-  "YESENIA",
-  "NANCY",
-  "INGRID",
-  "GILBERTO",
-  "ERICK",
-  "REBECA",
-  "MILENA",
-  "JESSICA",
-  "WILMAR",
-  "KATTIA",
-  "MARCOS",
-  "EUGENIA",
-  "BALTAZAR",
-  "HEBERT",
-  "AMED",
-  "MIRNA",
-  "LORENA",
-  "YISENIA",
-  "RANDALL",
-  "JACQUELINE",
-  "CORNELIO",
-  "ILSE",
-  "MAUREEN",
-  "ALEJANDRA",
-]);
-
-const COMPOUND_WHITELIST = new Set([
-  "VAN DER HAAR",
-  "MONTES DE OCA",
-  "LEON PAEZ",
-  "DIAZ GARZON",
-  "GUTIERREZ DE PIÑERES",
-  "RAMOS DE ANAYA",
-  "LOPEZ DE LARA",
-  "LOPEZ DE MEZA",
-  "MARTIN DE NICOLAS",
-  "HURTADO DE MENDOZA",
-  "ESPINOZA DE LOS MONTEROS",
-  "MAGNIN Y FALCON",
-  "OU YANG",
-]);
-
 const PARTICLES = /\b(DE|LA|LAS|LOS|DEL|Y|SAN|SANTA|VON|VAN|DA|DI)\b/;
 
 export class SurnameArbitrator {
-  public isValid(candidate: string, remainingText: string): boolean {
-    const upperCandidate = candidate.toUpperCase();
-    const parts = upperCandidate.split(" ");
-    const remainingTrimmed = remainingText.trim().toUpperCase();
-    if (COMPOUND_WHITELIST.has(upperCandidate)) return true;
+  private strategy: CountryStrategy;
+
+  constructor(strategy: CountryStrategy) {
+    this.strategy = strategy;
+  }
+
+  public arbitrate(
+    givenName: string,
+    surnameCandidate: string,
+    expectedSurnames: number,
+  ): ArbitrationResult {
+    const s1 = surnameCandidate.trim();
+
+    if (
+      expectedSurnames === 2 &&
+      s1.length === 1 &&
+      !VALID_SINGLE_LETTERS.has(s1)
+    ) {
+      return {
+        movedToGivenName: true,
+        newGivenName: `${givenName} ${s1}`.trim(),
+        newS1: "",
+      };
+    }
+
+    return {
+      movedToGivenName: false,
+      newGivenName: givenName,
+      newS1: surnameCandidate,
+    };
+  }
+
+  public isCommonGivenName(token: string): boolean {
+    const upper = token.toUpperCase();
+    return (
+      this.strategy.givenNames.has(upper) ||
+      (this.strategy.givenNamesBlacklist?.has(upper) ?? false)
+    );
+  }
+
+  public isValid(
+    candidate: string,
+    remainingText: string,
+    expectedSurnames: number,
+  ): boolean {
+    const parts = candidate.split(" ");
+    const upperCandidate = candidate;
+
+    const remainingTrimmed = remainingText.trim();
+    const remainingWordCount = remainingTrimmed
+      ? remainingTrimmed.split(/\s+/).length
+      : 0;
+
+    if (this.strategy.compoundWhitelist?.has(upperCandidate)) return true;
+    if (this.strategy.ambiguousSurnames?.has(upperCandidate)) {
+      if (remainingWordCount >= expectedSurnames) {
+        return true;
+      }
+      return false;
+    }
+
     if (parts.some((p) => p.length === 1 && !VALID_SINGLE_LETTERS.has(p))) {
       return false;
     }
+
     if (parts.length >= 2 && parts[0] === "DE" && parts[1] === "MARIA")
       return false;
     if (
@@ -634,8 +85,8 @@ export class SurnameArbitrator {
       return false;
 
     if (
-      (remainingTrimmed.endsWith("DE LOS") ||
-        remainingTrimmed.endsWith("DEL")) &&
+      (remainingTrimmed.toUpperCase().endsWith("DE LOS") ||
+        remainingTrimmed.toUpperCase().endsWith("DEL")) &&
       (parts[0] === "ANGELES" ||
         parts[0] === "CARMEN" ||
         parts[0] === "ROSARIO" ||
@@ -647,7 +98,7 @@ export class SurnameArbitrator {
 
     if (PARTICLES.test(upperCandidate)) {
       if (
-        COMMON_SURNAMES.has(parts[0]) &&
+        this.strategy.commonSurnames.has(parts[0]) &&
         (parts[1] === "DEL" || parts[1] === "DE" || parts[1] === "LA")
       ) {
         return false;
@@ -657,7 +108,7 @@ export class SurnameArbitrator {
         upperCandidate.startsWith("DE LA CRUZ ")
       ) {
         const lastWord = parts[parts.length - 1];
-        if (COMMON_SURNAMES.has(lastWord)) return false;
+        if (this.strategy.commonSurnames.has(lastWord)) return false;
       }
       if (
         upperCandidate === "DE LA" ||
@@ -668,27 +119,32 @@ export class SurnameArbitrator {
 
       return true;
     }
+
     if (parts.length === 2) {
       const firstWordOfCompound = parts[0];
-      if (CR_GIVEN_NAMES.has(firstWordOfCompound)) {
-        if (remainingTrimmed.split(" ").length === 1) {
+      if (this.strategy.givenNames.has(firstWordOfCompound)) {
+        if (remainingWordCount < expectedSurnames) {
           const secondWordOfCompound = parts[1];
-          if (!COMMON_SURNAMES.has(secondWordOfCompound)) {
+          if (!this.strategy.commonSurnames.has(secondWordOfCompound)) {
             return true;
           }
-
           return false;
         }
       }
     }
+
     if (parts.length === 2) {
       const w1 = parts[0];
       const w2 = parts[1];
-      if (COMMON_SURNAMES.has(w1) && COMMON_SURNAMES.has(w2)) {
+      if (
+        this.strategy.commonSurnames.has(w1) &&
+        this.strategy.commonSurnames.has(w2)
+      ) {
         return false;
       }
     }
-    if (GIVEN_NAMES_BLACKLIST.has(parts[0])) return false;
+
+    if (this.strategy.givenNamesBlacklist?.has(parts[0])) return false;
     if (parts.length === 2 && parts[0] === parts[1]) return false;
 
     return true;
