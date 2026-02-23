@@ -6,13 +6,18 @@ import { LatamNameParser, Dictionaries } from "../index";
 
 import { MX_STRATEGY } from "../../src/data/strategies/mx";
 import { CR_STRATEGY } from "../../src/data/strategies/cr";
-import { CountryStrategy } from "../types";
-
-// (Eliminados los imports directos de GIVEN_NAMES porque ya están dentro de las estrategias)
+import { AR_STRATEGY } from "../../src/data/strategies/ar";
+import { CountryStrategy, ParseOptions } from "../types";
 
 const CONFIGS: Record<
   string,
-  { name: string; dict: any; strategy: CountryStrategy; dir: string }
+  {
+    name: string;
+    dict: any;
+    strategy: CountryStrategy;
+    dir: string;
+    parseOptions?: ParseOptions;
+  }
 > = {
   cr: {
     name: "Costa Rica",
@@ -26,6 +31,13 @@ const CONFIGS: Record<
     strategy: MX_STRATEGY,
     dir: path.join(__dirname, "../../src/data/test/mx"),
   },
+  ar: {
+    name: "Argentina",
+    dict: [Dictionaries.AR],
+    strategy: AR_STRATEGY,
+    dir: path.join(__dirname, "../../src/data/test/ar"),
+    parseOptions: { expectedSurnames: 1 },
+  },
 };
 
 interface BenchmarkResult {
@@ -38,25 +50,25 @@ interface BenchmarkResult {
 }
 
 async function runBenchmarkForStrategy(
-  config: { name: string; dict: any; strategy: CountryStrategy; dir: string },
+  config: {
+    name: string;
+    dict: any;
+    strategy: CountryStrategy;
+    dir: string;
+    parseOptions?: ParseOptions;
+  },
   strategyName: string,
   dictionaries: any[],
   fileSuffix: string,
-  // useSpecificNames: boolean, // <-- Ya no necesitamos este flag porque la estrategia siempre va incluida
 ): Promise<BenchmarkResult> {
   console.log(`\nINICIANDO TEST: ${strategyName}`);
 
   const setupStart = performance.now();
 
-  // --- CORRECCIÓN QUIRÚRGICA AQUÍ ---
-  // Eliminamos 'givenNames' y pasamos solo 'strategy'.
-  // Ahora el parser siempre tendrá el contexto cultural correcto (MX o CR)
-  // y lo que comparamos es la potencia del diccionario de apellidos (Local vs LATAM).
   const parser = new LatamNameParser({
     dictionaries,
     strategy: config.strategy,
   });
-  // ----------------------------------
 
   const setupTime = performance.now() - setupStart;
   console.log(`Carga del Parser: ${setupTime.toFixed(2)} ms`);
@@ -100,6 +112,8 @@ async function runBenchmarkForStrategy(
 
     outputStream.write("[\n");
     let isFirst = true;
+    const batchSize = 50000;
+    let resultBatch: string[] = [];
 
     for await (let line of rl) {
       line = line.trim();
@@ -109,12 +123,28 @@ async function runBenchmarkForStrategy(
 
       try {
         const original = JSON.parse(line);
-        const result = parser.parse(original.nombreCompleto);
+
+        const result = parser.parse(
+          original.nombreCompleto,
+          config.parseOptions,
+        );
+
+        let expectedGN = (original.nombre || "").toUpperCase().trim();
+        if (expectedGN.includes("  "))
+          expectedGN = expectedGN.replace(/\s+/g, " ");
+
+        let expectedS1 = (original.apellido1 || "").toUpperCase().trim();
+        if (expectedS1.includes("  "))
+          expectedS1 = expectedS1.replace(/\s+/g, " ");
+
+        let expectedS2 = (original.apellido2 || "").toUpperCase().trim();
+        if (expectedS2.includes("  "))
+          expectedS2 = expectedS2.replace(/\s+/g, " ");
 
         const isCorrect =
-          original.nombre.toUpperCase() === result.givenName &&
-          original.apellido1.toUpperCase() === result.surname1 &&
-          original.apellido2.toUpperCase() === result.surname2;
+          expectedGN === result.givenName &&
+          expectedS1 === result.surname1 &&
+          expectedS2 === result.surname2;
 
         if (isCorrect) correctCount++;
 
@@ -134,10 +164,20 @@ async function runBenchmarkForStrategy(
           esCorrecto: isCorrect,
         };
 
-        const comma = isFirst ? "" : ",\n";
-        outputStream.write(comma + JSON.stringify(outputRecord));
-        isFirst = false;
+        resultBatch.push(JSON.stringify(outputRecord));
         globalCount++;
+        if (resultBatch.length >= batchSize) {
+          const prefix = isFirst ? "" : ",\n";
+          const blockToWrite = prefix + resultBatch.join(",\n");
+
+          const canWrite = outputStream.write(blockToWrite);
+          if (!canWrite) {
+            await new Promise((resolve) => outputStream.once("drain", resolve));
+          }
+
+          isFirst = false;
+          resultBatch = [];
+        }
 
         if (globalCount % 250000 === 0) {
           const pct = ((correctCount / globalCount) * 100).toFixed(2);
@@ -147,6 +187,19 @@ async function runBenchmarkForStrategy(
         }
       } catch (e) {}
     }
+
+    if (resultBatch.length > 0) {
+      const prefix = isFirst ? "" : ",\n";
+      const blockToWrite = prefix + resultBatch.join(",\n");
+
+      const canWrite = outputStream.write(blockToWrite);
+      if (!canWrite) {
+        await new Promise((resolve) => outputStream.once("drain", resolve));
+      }
+      isFirst = false;
+      resultBatch = [];
+    }
+
     outputStream.write("\n]");
     outputStream.end();
   }
@@ -179,7 +232,6 @@ async function main() {
       `${config.name} (Optimized)`,
       [config.dict],
       `_${countryArg.toUpperCase()}`,
-      // true, // Eliminado
     );
 
     const resultsLATAM = await runBenchmarkForStrategy(
@@ -187,7 +239,6 @@ async function main() {
       "LATAM (Grande)",
       [Dictionaries.LATAM],
       "_LATAM",
-      // false, // Eliminado
     );
 
     console.log("\n\n========================================================");

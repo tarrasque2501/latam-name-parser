@@ -15,6 +15,11 @@ const CONFIGS: Record<string, { name: string; dir: string; suffix: string }> = {
     dir: path.join(DATA_ROOT, "test/mx"),
     suffix: "_MX.json",
   },
+  ar: {
+    name: "Argentina",
+    dir: path.join(DATA_ROOT, "test/ar"),
+    suffix: "_AR.json",
+  },
 };
 
 const SAMPLE_LIMIT = 50;
@@ -128,11 +133,7 @@ async function analyze() {
   const samplesBothWrong: string[] = [];
   const samplesOnlySpecificWrong: string[] = [];
   const samplesOnlyLatamWrong: string[] = [];
-
-  // 🔥 DETECTOR DE VILLANOS (Compuestos perdidos)
   const missingCompounds = new Map<string, number>();
-
-  // 📉 PREPARAR CSV
   const csvPath = getCsvFilename(countryArg);
   const csvStream = fs.createWriteStream(csvPath, { encoding: "utf-8" });
   csvStream.write(
@@ -171,13 +172,12 @@ async function analyze() {
         if (specOK && latOK) {
           stats.bothCorrect++;
         } else {
-          // Clasificación del error para el CSV y Reporte
           if (!specOK && !latOK) {
             stats.bothWrong++;
             errorType = "AMBOS_FALLAN";
             if (samplesBothWrong.length < SAMPLE_LIMIT) {
               samplesBothWrong.push(
-                formatComparison(recSpec, recLat, "💀 AMBOS FALLAN"),
+                formatComparison(recSpec, recLat, "  AMBOS FALLAN"),
               );
             }
           } else if (!specOK && latOK) {
@@ -185,7 +185,7 @@ async function analyze() {
             errorType = "LOCAL_FALLA";
             if (samplesOnlySpecificWrong.length < SAMPLE_LIMIT) {
               samplesOnlySpecificWrong.push(
-                formatComparison(recSpec, recLat, "⚠️ LOCAL FALLA"),
+                formatComparison(recSpec, recLat, "  LOCAL FALLA"),
               );
             }
           } else if (specOK && !latOK) {
@@ -193,18 +193,15 @@ async function analyze() {
             errorType = "LATAM_FALLA";
             if (samplesOnlyLatamWrong.length < SAMPLE_LIMIT) {
               samplesOnlyLatamWrong.push(
-                formatComparison(recSpec, recLat, "✅ LOCAL GANA"),
+                formatComparison(recSpec, recLat, "  LOCAL GANA"),
               );
             }
           }
 
-          // 🔥 ANÁLISIS FORENSE: ¿Por qué falló el local?
-          // Buscamos apellidos compuestos que debieron ser detectados pero no lo fueron.
           if (!specOK) {
             const espAp1 = recSpec.esperado.ap1.trim();
             const espAp2 = recSpec.esperado.ap2.trim();
 
-            // Si el apellido esperado tiene espacios (es compuesto), y fallamos, es un candidato a Whitelist.
             if (espAp1.includes(" ")) {
               missingCompounds.set(
                 espAp1,
@@ -218,7 +215,6 @@ async function analyze() {
               );
             }
 
-            // Escribir en CSV
             csvStream.write(
               `${errorType},"${recSpec.nombreCompleto}","${recSpec.esperado.n}","${recSpec.esperado.ap1}","${recSpec.esperado.ap2}","${recSpec.obtenido.n}","${recSpec.obtenido.ap1}","${recSpec.obtenido.ap2}"\n`,
             );
@@ -234,8 +230,6 @@ async function analyze() {
   }
 
   csvStream.end();
-
-  // Generar ranking de villanos
   const topOffenders = Array.from(missingCompounds.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, OFFENDERS_LIMIT)
@@ -248,43 +242,43 @@ async function analyze() {
 
   const report = `
 ================================================================
-📊 REPORTE DE CALIDAD: ${config.name.toUpperCase()}
+  REPORTE DE CALIDAD: ${config.name.toUpperCase()}
 ================================================================
 Fecha: ${new Date().toLocaleString()}
 Total Registros: ${stats.total.toLocaleString()}
 
-🏆 SCOREBOARD GENERAL:
-- ${config.name} (Optimized):  ${((stats.specificCorrect / stats.total) * 100).toFixed(4)}%  (✅ ${stats.specificCorrect.toLocaleString()})
-- LATAM (General):       ${((stats.latamCorrect / stats.total) * 100).toFixed(4)}%  (✅ ${stats.latamCorrect.toLocaleString()})
+  SCOREBOARD GENERAL:
+- ${config.name} (Optimized):  ${((stats.specificCorrect / stats.total) * 100).toFixed(4)}%  (  ${stats.specificCorrect.toLocaleString()})
+- LATAM (General):       ${((stats.latamCorrect / stats.total) * 100).toFixed(4)}%  (  ${stats.latamCorrect.toLocaleString()})
 
-⚖️ BALANZA DE PODER:
+  BALANZA DE PODER:
 - Ambos Correctos:      ${stats.bothCorrect.toLocaleString()}
 - Ambos Incorrectos:    ${stats.bothWrong.toLocaleString()} (Morgue Común)
 - Local Gana (Latam Falla): ${stats.onlyLatamWrong.toLocaleString()} (Ruido Latam evitado)
 - LATAM Gana (Local Falla): ${stats.onlySpecificWrong.toLocaleString()} (Oportunidad de mejora Local)
 
 ================================================================
-1. 🕵️‍♂️ LOS MÁS BUSCADOS (Top Offenders)
+1.   LOS MÁS BUSCADOS (Top Offenders)
    (Apellidos compuestos que rompieron al parser local)
    Agregar estos a la Whitelist arreglará miles de casos.
 ================================================================
 ${topOffenders.length > 0 ? topOffenders.join("\n") : "¡No se detectaron patrones claros de compuestos faltantes!"}
 
 ================================================================
-2. 💀 LA MORGUE COMÚN (Donde NINGUNO pudo)
+2.   LA MORGUE COMÚN (Donde NINGUNO pudo)
    Total: ${stats.bothWrong.toLocaleString()}
 ================================================================
 ${samplesBothWrong.join("\n-----------------------------------------\n")}
 
 ================================================================
-3. ⚠️ ERRORES EXCLUSIVOS DE ${config.name.toUpperCase()} (Oportunidades de Mejora)
+3.   ERRORES EXCLUSIVOS DE ${config.name.toUpperCase()} (Oportunidades de Mejora)
    (Casos donde el diccionario LATAM sí funcionó)
    Total: ${stats.onlySpecificWrong.toLocaleString()}
 ================================================================
 ${samplesOnlySpecificWrong.join("\n-----------------------------------------\n")}
 
 ================================================================
-4. ✅ ERRORES EXCLUSIVOS DE LATAM (Ruido Agregado)
+4.   ERRORES EXCLUSIVOS DE LATAM (Ruido Agregado)
    (Casos donde Local estaba bien, pero LATAM lo rompió)
    Total: ${stats.onlyLatamWrong.toLocaleString()}
 ================================================================
@@ -292,9 +286,9 @@ ${samplesOnlyLatamWrong.join("\n-----------------------------------------\n")}
 `;
 
   fs.writeFileSync(finalReportPath, report);
-  console.log(`\n\n✅ ANÁLISIS COMPLETO.`);
-  console.log(`📄 Reporte texto: ${finalReportPath}`);
-  console.log(`📊 Reporte CSV:   ${csvPath}`);
+  console.log(`\n\n  ANÁLISIS COMPLETO.`);
+  console.log(`  Reporte texto: ${finalReportPath}`);
+  console.log(`  Reporte CSV:   ${csvPath}`);
 }
 
 analyze();

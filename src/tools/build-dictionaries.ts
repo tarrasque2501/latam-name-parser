@@ -3,7 +3,7 @@ import path from "path";
 import readline from "readline";
 
 const DATA_ROOT = path.join(__dirname, "../../src/data");
-const MIN_NAME_FREQUENCY = 500; // Ajusta esto si quieres más o menos nombres
+const MIN_NAME_FREQUENCY = 500;
 
 interface CountryConfig {
   inputDir: string;
@@ -13,7 +13,6 @@ interface CountryConfig {
   filePattern: RegExp;
   encoding: BufferEncoding;
   skipHeader: boolean;
-  // Modificado: Ahora acepta string[] para manejar múltiples archivos si es necesario
   files?: string[];
   parseLine: (
     line: string,
@@ -27,10 +26,8 @@ interface CountryConfig {
   } | null;
 }
 
-// Función para reparar codificación (UTF-8 mal interpretado como Latin1/Windows-1252)
 function fixEncoding(str: string): string {
   try {
-    // Truco común: convertir a binario latin1 y leer como utf-8
     return Buffer.from(str, "binary").toString("utf-8");
   } catch (e) {
     return str;
@@ -66,7 +63,6 @@ const STRATEGIES: Record<string, CountryConfig> = {
     skipHeader: true,
     parseLine: (line) => {
       const parts = line.split(",");
-      // Asumiendo formato: NOMBRE,PRIMER APELLIDO,SEGUNDO APELLIDO
       if (parts.length < 3) return null;
       return {
         name: parts[0]?.trim() || "",
@@ -75,16 +71,14 @@ const STRATEGIES: Record<string, CountryConfig> = {
       };
     },
   },
-  // 🔥 NUEVA ESTRATEGIA PARA ARGENTINA (AR)
   ar: {
     inputDir: path.join(DATA_ROOT, "ar"),
     outputSurnamesFile: path.join(DATA_ROOT, "surnames-ar.json"),
     outputGivenNamesFile: path.join(DATA_ROOT, "givenNames-ar.ts"),
     variableName: "AR_GIVEN_NAMES",
     filePattern: /\.csv$/,
-    encoding: "latin1", // CSVs viejos suelen venir en latin1, pero usaremos fixEncoding
+    encoding: "latin1",
     skipHeader: true,
-    // Definimos explícitamente los archivos porque tienen estructuras diferentes
     files: [
       "historico-nombres.csv",
       "apellidos_cantidad_personas_provincia.csv",
@@ -92,13 +86,10 @@ const STRATEGIES: Record<string, CountryConfig> = {
     parseLine: (line, fileName) => {
       const parts = line.split(",");
 
-      // 1. Procesamiento de NOMBRES (historico-nombres.csv)
-      // Columnas esperadas: nombre, cantidad, anio
       if (fileName?.includes("historico-nombres")) {
         if (parts.length < 2) return null;
         let rawName = parts[0]?.trim().replace(/"/g, "") || "";
 
-        // Arreglar codificación rota (ej: HaydÃ© -> Haydé)
         if (rawName.includes("Ã")) {
           rawName = fixEncoding(rawName);
         }
@@ -107,20 +98,16 @@ const STRATEGIES: Record<string, CountryConfig> = {
         return { name: rawName, count: isNaN(count) ? 1 : count };
       }
 
-      // 2. Procesamiento de APELLIDOS (apellidos_cantidad...)
-      // Columnas esperadas: apellido, cantidad, ...
       if (fileName?.includes("apellidos_cantidad")) {
         if (parts.length < 2) return null;
         let surname = parts[0]?.trim().replace(/"/g, "") || "";
 
-        // Arreglar codificación
         if (surname.includes("Ã")) {
           surname = fixEncoding(surname);
         }
 
         const count = parseInt(parts[1] || "0", 10);
 
-        // Solo nos interesan apellidos compuestos para el JSON
         if (surname.includes(" ")) {
           return { surname: surname, count: isNaN(count) ? 1 : count };
         }
@@ -140,16 +127,13 @@ async function buildDictionaries(countryCode: string) {
 
   console.log(`Iniciando construcción para ${countryCode.toUpperCase()}...`);
 
-  // Mapas para conteo y unicidad
   const givenNameCounts = new Map<string, number>();
   const compoundSurnamesCounts = new Map<string, number>();
 
-  // Determinar qué archivos procesar
   let filesToProcess: string[] = [];
   if (config.files) {
     filesToProcess = config.files.map((f) => path.join(config.inputDir, f));
   } else {
-    // Si no hay lista explícita, buscar por patrón (lógica original)
     if (fs.existsSync(config.inputDir)) {
       filesToProcess = fs
         .readdirSync(config.inputDir)
@@ -184,20 +168,17 @@ async function buildDictionaries(countryCode: string) {
       }
       totalLines++;
 
-      // Pasamos el nombre del archivo para saber qué lógica aplicar
       const data = config.parseLine(line, path.basename(filePath));
       if (!data) continue;
 
-      // --- LÓGICA DE NOMBRES ---
       if (data.name) {
-        // Normalización: Mayúsculas y separar compuestos
         const tokens = data.name
           .toUpperCase()
           .split(" ")
           .map((t) => t.trim())
           .filter(
             (t) =>
-              t.length > 1 && // Ignorar iniciales sueltas
+              t.length > 1 &&
               ![
                 "DE",
                 "LA",
@@ -213,7 +194,6 @@ async function buildDictionaries(countryCode: string) {
         const count = data.count || 1;
 
         tokens.forEach((token) => {
-          // Excluir caracteres inválidos
           if (/^[A-ZÑÁÉÍÓÚÜ]+$/.test(token)) {
             givenNameCounts.set(
               token,
@@ -223,18 +203,15 @@ async function buildDictionaries(countryCode: string) {
         });
       }
 
-      // --- LÓGICA DE APELLIDOS (General y AR) ---
       const apellidos = [];
       if (data.ap1) apellidos.push(data.ap1);
       if (data.ap2) apellidos.push(data.ap2);
-      if (data.surname) apellidos.push(data.surname); // Caso AR
+      if (data.surname) apellidos.push(data.surname);
 
       apellidos.forEach((ap) => {
         const cleanAp = ap.toUpperCase().trim();
-        // Solo guardamos compuestos
         if (cleanAp.includes(" ")) {
           const count = data.count || 1;
-          // Acumular frecuencia para ordenar después
           compoundSurnamesCounts.set(
             cleanAp,
             (compoundSurnamesCounts.get(cleanAp) || 0) + count,
@@ -246,11 +223,9 @@ async function buildDictionaries(countryCode: string) {
 
   console.log(`\nANÁLISIS FINALIZADO (${totalLines.toLocaleString()} líneas)`);
 
-  // --- GENERACIÓN DE ARCHIVO DE NOMBRES ---
-  // Filtramos por frecuencia para limpiar basura (errores de OCR, typos raros)
   const sortedNames = Array.from(givenNameCounts.entries())
-    .filter(([_, count]) => count > MIN_NAME_FREQUENCY) // Umbral de ruido
-    .sort((a, b) => b[1] - a[1]) // Más frecuentes primero
+    .filter(([_, count]) => count > MIN_NAME_FREQUENCY)
+    .sort((a, b) => b[1] - a[1])
     .map(([name]) => name);
 
   const namesContent = `
@@ -265,11 +240,9 @@ export const ${config.variableName} = new Set<string>([
     `Nombres actualizados en: ${config.outputGivenNamesFile} (${sortedNames.length} nombres únicos)`,
   );
 
-  // --- GENERACIÓN DE ARCHIVO DE APELLIDOS (JSON) ---
-  // Ordenar apellidos compuestos por frecuencia (los más comunes primero)
   const sortedSurnames = Array.from(compoundSurnamesCounts.entries())
-    .sort((a, b) => b[1] - a[1]) // Mayor cantidad primero
-    .map(([surname]) => surname); // Solo el nombre
+    .sort((a, b) => b[1] - a[1])
+    .map(([surname]) => surname);
 
   fs.writeFileSync(
     config.outputSurnamesFile,
@@ -280,7 +253,6 @@ export const ${config.variableName} = new Set<string>([
   );
 }
 
-// Ejecutar para el argumento pasado (ej: "ts-node build-dictionaries.ts ar")
 const targetCountry = process.argv[2];
 if (targetCountry) {
   buildDictionaries(targetCountry).catch(console.error);

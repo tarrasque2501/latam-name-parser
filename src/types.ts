@@ -3,6 +3,7 @@ export type OutputFormat = "hyphenated-full" | "hyphenated-surname" | "natural";
 
 export interface ParseOptions {
   format?: NameFormat;
+  expectedSurnames?: 1 | 2;
 }
 
 export interface ParsedName {
